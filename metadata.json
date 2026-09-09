@@ -1,0 +1,6 @@
+{
+  "name": "ChoreSync",
+  "description": "Equitable and flexible household chore coordination system for roommates, families, and couples.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
