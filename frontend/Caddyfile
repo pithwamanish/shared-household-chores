@@ -15,20 +15,15 @@
     @assets path /assets/*
     header @assets Cache-Control "public, max-age=31536000, immutable"
 
-    # Health Check endpoint
+    # Health Check endpoint - responds directly so web server passes health checks independently
     handle /healthz {
-        reverse_proxy {$BACKEND_URL:backend:8000} {
-            header_up Host {upstream_hostport}
-        }
+        respond "OK" 200
     }
 
-    # API Reverse Proxy to Backend Service
+    # API Reverse Proxy to Backend Service (supports both internal host:port and https:// public URL)
     handle /api/* {
         reverse_proxy {$BACKEND_URL:backend:8000} {
-            header_up Host {upstream_hostport}
             header_up X-Real-IP {remote_host}
-            header_up X-Forwarded-For {remote_host}
-            header_up X-Forwarded-Proto {scheme}
             # Preserve or inject W3C trace context headers
             header_up traceparent {header.traceparent}
             header_up tracestate {header.tracestate}

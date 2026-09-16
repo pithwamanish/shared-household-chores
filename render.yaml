@@ -51,9 +51,6 @@ services:
     envVars:
       - key: PORT
         value: 80
-      # Connects Caddy to the backend web service URL
+      # Public HTTPS URL of the backend web service on Render Free Tier
       - key: BACKEND_URL
-        fromService:
-          type: web
-          name: choresync-backend
-          property: hostport
+        value: https://choresync-backend-euiz.onrender.com
