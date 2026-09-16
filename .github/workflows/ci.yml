@@ -107,6 +107,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Create Observability Network
+        run: docker network create observability-net || true
+
       - name: Start Full Stack in Docker Compose
         run: docker compose up -d --build postgres backend frontend
 
