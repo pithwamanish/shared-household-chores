@@ -136,11 +136,13 @@ oncall-test:
 	@bash on-call-engineer/scripts/trigger-test-incident
 
 demo-record:
-	@echo "Recording Playwright architecture & observability demo video..."
+	@echo "1. Pre-warming live observability data (Loki logs, Tempo traces, firing alerts)..."
+	@python3 e2e/demo/prewarm.py
+	@echo "2. Recording Playwright architecture demo video in container..."
 	@docker compose run --rm e2e node demo/record.js
-	@cp -f e2e/recordings/*.webm _docs/videos/choresync_architecture_observability_demo.webm 2>/dev/null || true
-	@cp -f e2e/recordings/*.webm frontend/public/choresync_demo.webm 2>/dev/null || true
-	@echo "Demo recording saved to _docs/videos/ and frontend/public/!"
+	@echo "3. Multiplexing video with synchronized voice narration into WebM and MP4..."
+	@bash e2e/demo/mux.sh
+	@echo "Demo recording complete! Watch at http://localhost:3000/demo.html"
 
 demo-view:
 	@echo "Open http://localhost:3000/demo.html in your browser to watch the interactive demo video."

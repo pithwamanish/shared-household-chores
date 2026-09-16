@@ -18,6 +18,10 @@ RUN npm run build
 # ========================================================
 FROM caddy:2-alpine
 
+# Remove Linux file capability bit to allow execution under restricted
+# container runtimes (e.g. Render, OpenShift, --cap-drop=ALL)
+RUN setcap -r /usr/bin/caddy
+
 # Copy compiled static assets from builder
 COPY --from=builder /app/dist /srv
 

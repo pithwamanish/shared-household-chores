@@ -11,46 +11,49 @@ Open your browser to:
 * **Local**: [http://localhost:3000/demo.html](http://localhost:3000/demo.html)
 * **LAN**: `http://<HOST_IP>:3000/demo.html` (e.g. `http://192.168.0.105:3000/demo.html`)
 
-The interactive player features direct timestamp jumping, video scrubbing, and quick links to live observability services.
+The interactive player features direct timestamp jumping, video scrubbing, spoken audio narration, and quick links to live observability services.
 
 ### Option B: Local Media Players
-The raw high-definition recording is stored in the repository at:
-* [`_docs/videos/choresync_architecture_observability_demo.webm`](videos/choresync_architecture_observability_demo.webm)
-* [`frontend/public/choresync_demo.webm`](../frontend/public/choresync_demo.webm)
-* [`e2e/recordings/choresync_architecture_observability_demo.webm`](../e2e/recordings/choresync_architecture_observability_demo.webm)
+Both MP4 and WebM formats with synchronized voice narration are stored in the repository:
+* **MP4 (Universal - H.264 + AAC)**: [`_docs/videos/choresync_architecture_observability_demo.mp4`](videos/choresync_architecture_observability_demo.mp4) (6.1 MB)
+* **WebM (Modern Web - VP8 + Opus)**: [`_docs/videos/choresync_architecture_observability_demo.webm`](videos/choresync_architecture_observability_demo.webm) (13.1 MB)
+* Also served statically from [`frontend/public/`](../frontend/public/)
 
-Compatible with VLC Media Player, Google Chrome, Mozilla Firefox, Microsoft Edge, and Apple Safari.
+Compatible with VLC Media Player, QuickTime, Windows Media Player, Google Chrome, Mozilla Firefox, Microsoft Edge, and Apple Safari.
 
 ---
 
 ## 2. Re-Recording the Demo
 
-To trigger a fresh recording from scratch using the containerized Playwright engine:
+To trigger a fresh recording from scratch:
 
 ```bash
 make demo-record
 ```
 
-This launches a headless Chromium instance in 720p HD, navigates through all presentation slides and live UI pages, injects the on-screen HUD, simulates live errors, and writes the output to `_docs/videos/`.
+This pipeline automatically:
+1. Pre-warms live data across all observability tools (Loki logs, Tempo traces, and firing Prometheus alert)
+2. Records the full-featured browser walkthrough in an isolated Playwright container with exact narration timings
+3. Multiplexes the video with spoken voice narration audio into both WebM and MP4 formats.
 
 ---
 
-## 3. Video Chapters & Architectural Topics
+## 3. Video Chapters & Architectural Topics (Spoken Narration Included)
 
 | Chapter | Time | Topic Demonstrated | Architectural Context & Behind-the-Scenes Insight |
 | :---: | :---: | :--- | :--- |
 | **01** | `0:00` | **Architecture Overview** | Core Go 1.22 Chi API, PostgreSQL 16 store (`sqlc` + `pgx/v5`), React 18 frontend, and standalone LGTM observability stack. |
-| **02** | `0:07` | **Frontend Kiosk & Dev Mailbox** | Demonstrates the Shared Kitchen Tablet touch bar, Admin PIN verification, and the in-memory transactional Dev Mailbox modal capturing magic links and chore reminders without external SMTP spam. |
-| **03** | `0:18` | **W3C Distributed Tracing Flow** | Context propagation journey: React Web SDK ➔ Caddy reverse proxy ➔ Go Chi API ➔ PostgreSQL database (`pgx.QueryTracer`). |
-| **04** | `0:25` | **Grafana Observability Dashboard** | Live Golden Signals dashboard showing Prometheus exporter scrape health (all UP), OTel Collector span throughput, and Loki log streams. |
-| **05** | `0:33` | **Distributed Tracing in Tempo** | TraceQL query engine, trace waterfall visualization, and exact parameterized SQL query statement latencies. |
-| **06** | `0:40` | **Log Aggregation in Loki** | Structured container log exploration with LogQL and automatic TraceID correlation linking logs to Tempo traces. |
-| **07** | `0:47` | **Actionable Alerts in Prometheus** | Symptom-based alert rules: `HighHttpErrorRate` (> 5%), `HighRequestLatency` (> 1s), and `DatabaseQueryErrors` (> 0.05/s) with dashboard and runbook URLs. |
-| **08** | `0:53` | **Live Incident Simulation** | Synthetic error burst hitting `/api/v1/dev/simulate-error`, pushing error rate to 66.7%, and watching Prometheus transition from PENDING to FIRING. |
-| **09** | `1:02` | **Alertmanager Notification Routing** | Grouped webhook dispatch to `http://on-call-receiver:5050/webhook`. |
-| **10** | `1:07` | **On-Call Receiver Normalization** | Standardized payload normalization against `payload-schema.json` and autonomous agent incident preparation. |
-| **11** | `1:14` | **Two-Stage Container Delivery** | "Build Once, Promote Everywhere": immutable timestamp tags (`YYYYMMDD-HHMMSS-shortsha`), zero-compiler deploy compose, and SHA256 digest promotion. |
-| **12** | `1:22` | **Final Quality Sign-Off** | 100% green verification matrix across Go unit tests, PostgreSQL store tests, 11 Playwright E2E journeys, and incident remediation suites. |
+| **02** | `0:18` | **Frontend Kiosk & Dev Mailbox** | Demonstrates the Shared Kitchen Tablet touch bar, Admin PIN verification, and the in-memory transactional Dev Mailbox modal capturing magic links and chore reminders without external SMTP spam. |
+| **03** | `0:42` | **W3C Distributed Tracing Flow** | Context propagation journey: React Web SDK ➔ Caddy reverse proxy ➔ Go Chi API ➔ PostgreSQL database (`pgx.QueryTracer`). |
+| **04** | `1:06` | **Grafana Observability Dashboard** | Live Golden Signals dashboard showing Prometheus exporter scrape health (all UP), OTel Collector span throughput, and live Loki container logs. |
+| **05** | `1:22` | **Distributed Tracing in Tempo** | TraceQL query engine, trace waterfall visualization with database query statement latencies and nested spans. |
+| **06** | `1:40` | **Log Aggregation in Loki** | Structured container log exploration with LogQL and automatic TraceID correlation linking logs to Tempo traces. |
+| **07** | `1:58` | **Actionable Alerts in Prometheus** | Symptom-based alert rules: `HighHttpErrorRate` (> 5%), `HighRequestLatency` (> 1s), and `DatabaseQueryErrors` (> 0.05/s) with dashboard and runbook URLs. |
+| **08** | `2:14` | **Live Incident Simulation** | Active `HighHttpErrorRate` alert in red FIRING state with observed error rate (66.7%), threshold (5%), and annotations. |
+| **09** | `2:29` | **Alertmanager Notification Routing** | Grouped webhook dispatch to `http://on-call-receiver:5050/webhook`. |
+| **10** | `2:39` | **On-Call Receiver Normalization** | Live incident dashboard (:5050) displaying the normalized payload against `payload-schema.json` with firing badge. |
+| **11** | `2:52` | **Two-Stage Container Delivery** | "Build Once, Promote Everywhere": immutable timestamp tags (`YYYYMMDD-HHMMSS-shortsha`), zero-compiler deploy compose, and SHA256 digest promotion. |
+| **12** | `3:13` | **Final Quality Sign-Off** | 100% green verification matrix across Go unit tests, PostgreSQL store tests, 11 Playwright E2E journeys, and incident remediation suites. |
 
 ---
 
