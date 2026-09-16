@@ -35,6 +35,17 @@ services:
         value: mock
       - key: RESEND_API_KEY
         sync: false
+      # OpenTelemetry APM Configuration (Level 2 Observability)
+      - key: OTEL_SERVICE_NAME
+        value: api-backend
+      - key: DEPLOYMENT_ENVIRONMENT
+        value: production
+      - key: SERVICE_VERSION
+        value: prod-latest
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: OTEL_EXPORTER_OTLP_HEADERS
+        sync: false
 
   # ----------------------------------------------------------------------------
   # 2. Frontend Production Service (Caddy 2 Reverse Proxy + Vite React SPA)

@@ -26,6 +26,7 @@ type Config struct {
 	Environment string
 	Version     string
 	Endpoint    string
+	Headers     map[string]string
 }
 
 // LoadConfigFromEnv reads OpenTelemetry settings from environment variables with safe defaults.
@@ -56,11 +57,23 @@ func LoadConfigFromEnv() Config {
 		endpoint = "http://otel-collector:4318"
 	}
 
+	headers := make(map[string]string)
+	rawHeaders := os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	if rawHeaders != "" {
+		for _, part := range strings.Split(rawHeaders, ",") {
+			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
+			if len(kv) == 2 {
+				headers[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			}
+		}
+	}
+
 	return Config{
 		ServiceName: serviceName,
 		Environment: env,
 		Version:     ver,
 		Endpoint:    endpoint,
+		Headers:     headers,
 	}
 }
 
@@ -107,6 +120,10 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 	} else {
 		host := strings.TrimPrefix(strings.TrimPrefix(cfg.Endpoint, "http://"), "https://")
 		opts = append(opts, otlptracehttp.WithEndpoint(host), otlptracehttp.WithInsecure())
+	}
+
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlptracehttp.WithHeaders(cfg.Headers))
 	}
 
 	exporter, err := otlptracehttp.New(ctx, opts...)
@@ -159,6 +176,10 @@ func InitMeter(ctx context.Context) (func(context.Context) error, error) {
 	} else {
 		host := strings.TrimPrefix(strings.TrimPrefix(cfg.Endpoint, "http://"), "https://")
 		opts = append(opts, otlpmetrichttp.WithEndpoint(host), otlpmetrichttp.WithInsecure())
+	}
+
+	if len(cfg.Headers) > 0 {
+		opts = append(opts, otlpmetrichttp.WithHeaders(cfg.Headers))
 	}
 
 	exporter, err := otlpmetrichttp.New(ctx, opts...)
