@@ -56,4 +56,4 @@ services:
         fromService:
           type: web
           name: choresync-backend
-          property: host
+          property: hostport

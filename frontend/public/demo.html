@@ -142,71 +142,72 @@
     </header>
 
     <div class="video-wrapper">
-      <video id="demoVideo" controls autoplay loop playsinline>
+      <video id="demoVideo" controls autoplay playsinline>
+        <source src="/choresync_demo.mp4" type="video/mp4">
         <source src="/choresync_demo.webm" type="video/webm">
-        Your browser does not support WebM video streaming.
+        Your browser does not support HTML5 video streaming.
       </video>
     </div>
 
-    <h2 style="font-size:18px; margin-bottom:14px; color:#e2e8f0;">📌 Video Chapters & Timeline</h2>
+    <h2 style="font-size:18px; margin-bottom:14px; color:#e2e8f0;">📌 Video Chapters & Timeline (Spoken Voice Narration Included)</h2>
     <div class="chapters">
       <div class="chapter-card" onclick="seek(0)">
         <div class="chapter-time">0:00</div>
         <div class="chapter-title">1. System Architecture Overview</div>
         <div class="chapter-desc">Go 1.22 Chi API, PostgreSQL 16 store, React 18, and LGTM observability stack.</div>
       </div>
-      <div class="chapter-card" onclick="seek(7)">
-        <div class="chapter-time">0:07</div>
+      <div class="chapter-card" onclick="seek(18)">
+        <div class="chapter-time">0:18</div>
         <div class="chapter-title">2. Frontend Kiosk & Dev Mailbox</div>
         <div class="chapter-desc">Kitchen Tablet touch bar, Admin PIN unlock, and the in-memory transactional Dev Mailbox modal.</div>
       </div>
-      <div class="chapter-card" onclick="seek(18)">
-        <div class="chapter-time">0:18</div>
+      <div class="chapter-card" onclick="seek(42)">
+        <div class="chapter-time">0:42</div>
         <div class="chapter-title">3. W3C Context Propagation</div>
         <div class="chapter-desc">End-to-end tracing from React Web SDK through Caddy and Go API to PostgreSQL queries.</div>
       </div>
-      <div class="chapter-card" onclick="seek(25)">
-        <div class="chapter-time">0:25</div>
+      <div class="chapter-card" onclick="seek(66)">
+        <div class="chapter-time">1:06</div>
         <div class="chapter-title">4. Grafana Observability Dashboard</div>
         <div class="chapter-desc">Live Golden Signals dashboard, Prometheus scrape health, and span throughput.</div>
       </div>
-      <div class="chapter-card" onclick="seek(33)">
-        <div class="chapter-time">0:33</div>
+      <div class="chapter-card" onclick="seek(82)">
+        <div class="chapter-time">1:22</div>
         <div class="chapter-title">5. Distributed Tracing in Tempo</div>
         <div class="chapter-desc">Trace waterfall graph and PostgreSQL pgx.QueryTracer parameterized statement latencies.</div>
       </div>
-      <div class="chapter-card" onclick="seek(40)">
-        <div class="chapter-time">0:40</div>
+      <div class="chapter-card" onclick="seek(100)">
+        <div class="chapter-time">1:40</div>
         <div class="chapter-title">6. Log Aggregation in Loki</div>
         <div class="chapter-desc">Structured container log exploration with LogQL and automatic TraceID correlation.</div>
       </div>
-      <div class="chapter-card" onclick="seek(47)">
-        <div class="chapter-time">0:47</div>
+      <div class="chapter-card" onclick="seek(118)">
+        <div class="chapter-time">1:58</div>
         <div class="chapter-title">7. Actionable Alerts in Prometheus</div>
         <div class="chapter-desc">HighHttpErrorRate, HighRequestLatency, and DatabaseQueryErrors alert rules.</div>
       </div>
-      <div class="chapter-card" onclick="seek(53)">
-        <div class="chapter-time">0:53</div>
+      <div class="chapter-card" onclick="seek(134)">
+        <div class="chapter-time">2:14</div>
         <div class="chapter-title">8. Live Incident Simulation</div>
         <div class="chapter-desc">Synthetic 5xx error generation, rule evaluation, and alert transition to FIRING.</div>
       </div>
-      <div class="chapter-card" onclick="seek(62)">
-        <div class="chapter-time">1:02</div>
+      <div class="chapter-card" onclick="seek(149)">
+        <div class="chapter-time">2:29</div>
         <div class="chapter-title">9. Alertmanager Notification Routing</div>
         <div class="chapter-desc">Grouped webhook dispatch to http://on-call-receiver:5050/webhook.</div>
       </div>
-      <div class="chapter-card" onclick="seek(67)">
-        <div class="chapter-time">1:07</div>
+      <div class="chapter-card" onclick="seek(159)">
+        <div class="chapter-time">2:39</div>
         <div class="chapter-title">10. On-Call Receiver Normalization</div>
         <div class="chapter-desc">Standardized payload normalization and autonomous agent incident preparation.</div>
       </div>
-      <div class="chapter-card" onclick="seek(74)">
-        <div class="chapter-time">1:14</div>
+      <div class="chapter-card" onclick="seek(172)">
+        <div class="chapter-time">2:52</div>
         <div class="chapter-title">11. Two-Stage Container Delivery</div>
         <div class="chapter-desc">Build Once, Promote Everywhere: immutable timestamp tags and runtime deployment.</div>
       </div>
-      <div class="chapter-card" onclick="seek(82)">
-        <div class="chapter-time">1:22</div>
+      <div class="chapter-card" onclick="seek(193)">
+        <div class="chapter-time">3:13</div>
         <div class="chapter-title">12. Final Quality Sign-Off</div>
         <div class="chapter-desc">100% green verification matrix across unit, store, E2E, and incident test suites.</div>
       </div>
