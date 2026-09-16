@@ -59,11 +59,23 @@ func LoadConfigFromEnv() Config {
 
 	headers := make(map[string]string)
 	rawHeaders := os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
+	if rawHeaders == "" {
+		rawHeaders = os.Getenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS")
+	}
 	if rawHeaders != "" {
 		for _, part := range strings.Split(rawHeaders, ",") {
-			kv := strings.SplitN(strings.TrimSpace(part), "=", 2)
-			if len(kv) == 2 {
-				headers[strings.TrimSpace(kv[0])] = strings.TrimSpace(kv[1])
+			part = strings.TrimSpace(part)
+			part = strings.Trim(part, "\"'")
+			var key, val string
+			if idx := strings.Index(part, "="); idx != -1 {
+				key = strings.TrimSpace(part[:idx])
+				val = strings.TrimSpace(part[idx+1:])
+			} else if idx := strings.Index(part, ":"); idx != -1 {
+				key = strings.TrimSpace(part[:idx])
+				val = strings.TrimSpace(part[idx+1:])
+			}
+			if key != "" && val != "" {
+				headers[key] = val
 			}
 		}
 	}
@@ -114,7 +126,11 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 			opts = append(opts, otlptracehttp.WithInsecure())
 		}
 		path := strings.TrimSuffix(parsedURL.Path, "/")
-		if path != "" {
+		if strings.HasSuffix(path, "/v1/traces") {
+			opts = append(opts, otlptracehttp.WithURLPath(path))
+		} else if strings.HasSuffix(path, "/v1/metrics") {
+			opts = append(opts, otlptracehttp.WithURLPath(strings.TrimSuffix(path, "/v1/metrics")+"/v1/traces"))
+		} else if path != "" {
 			opts = append(opts, otlptracehttp.WithURLPath(path+"/v1/traces"))
 		}
 	} else {
@@ -146,6 +162,20 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 	log.Printf("[OpenTelemetry] Tracing initialized: service.name=%s, deployment.environment=%s, service.version=%s, endpoint=%s",
 		cfg.ServiceName, cfg.Environment, cfg.Version, cfg.Endpoint)
 
+	// Emit an immediate startup heartbeat span and flush so APM test connection checks succeed instantly
+	go func() {
+		tr := tp.Tracer("choresync-system")
+		_, span := tr.Start(context.Background(), "server.boot")
+		span.SetAttributes(
+			attribute.String("server.status", "online"),
+			attribute.String("service.name", cfg.ServiceName),
+			attribute.String("deployment.environment", cfg.Environment),
+			attribute.String("service.version", cfg.Version),
+		)
+		span.End()
+		_ = tp.ForceFlush(context.Background())
+	}()
+
 	return tp.Shutdown, nil
 }
 
@@ -170,7 +200,11 @@ func InitMeter(ctx context.Context) (func(context.Context) error, error) {
 			opts = append(opts, otlpmetrichttp.WithInsecure())
 		}
 		path := strings.TrimSuffix(parsedURL.Path, "/")
-		if path != "" {
+		if strings.HasSuffix(path, "/v1/metrics") {
+			opts = append(opts, otlpmetrichttp.WithURLPath(path))
+		} else if strings.HasSuffix(path, "/v1/traces") {
+			opts = append(opts, otlpmetrichttp.WithURLPath(strings.TrimSuffix(path, "/v1/traces")+"/v1/metrics"))
+		} else if path != "" {
 			opts = append(opts, otlpmetrichttp.WithURLPath(path+"/v1/metrics"))
 		}
 	} else {
