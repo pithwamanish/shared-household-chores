@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NormalizedAlertIncidentPayload",
+  "type": "object",
+  "required": [
+    "alert",
+    "service",
+    "deployment",
+    "metric",
+    "dashboard_url",
+    "runbook_url",
+    "timestamp"
+  ],
+  "properties": {
+    "alert": {
+      "type": "object",
+      "required": ["name", "state", "severity"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Unique identifier of the alert (e.g. HighHttpErrorRate, HighRequestLatency)"
+        },
+        "state": {
+          "type": "string",
+          "enum": ["firing", "resolved"],
+          "description": "Current alert lifecycle state"
+        },
+        "severity": {
+          "type": "string",
+          "enum": ["critical", "warning", "info"],
+          "description": "Severity of the alert"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Canonical service identity (e.g. api-backend, web-frontend)"
+        },
+        "version": {
+          "type": "string",
+          "description": "Deployed commit SHA or release tag (e.g. dev-latest, 20260916-150000-shortsha)"
+        }
+      }
+    },
+    "deployment": {
+      "type": "object",
+      "required": ["environment"],
+      "properties": {
+        "environment": {
+          "type": "string",
+          "enum": ["development", "staging", "production"],
+          "description": "Deployment environment"
+        }
+      }
+    },
+    "metric": {
+      "type": "object",
+      "required": ["name", "observed_value", "threshold"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The telemetry metric breaching threshold"
+        },
+        "observed_value": {
+          "type": "number",
+          "description": "Numeric value observed at breach time"
+        },
+        "threshold": {
+          "type": "number",
+          "description": "Configured alert threshold"
+        },
+        "duration": {
+          "type": "string",
+          "description": "Sustained duration before firing (e.g. 30s, 1m)"
+        }
+      }
+    },
+    "dashboard_url": {
+      "type": "string",
+      "description": "URL of the relevant Grafana dashboard"
+    },
+    "runbook_url": {
+      "type": "string",
+      "description": "URL or relative path to the incident triage runbook"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "description": "UTC timestamp of alert event in ISO-8601 format"
+    }
+  }
+}

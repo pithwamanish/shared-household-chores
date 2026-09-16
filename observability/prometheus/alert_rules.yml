@@ -1,0 +1,54 @@
+groups:
+  - name: choresync-critical-alerts
+    rules:
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum(rate(choresync_http_requests_total{http_status_code=~"5.."}[1m]))
+            /
+            clamp_min(sum(rate(choresync_http_requests_total[1m])), 0.001)
+          ) * 100 > 5
+        for: 30s
+        labels:
+          severity: critical
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "Elevated HTTP 5xx error rate on {{ $labels.service }}"
+          description: "Service {{ $labels.service }} in {{ $labels.environment }} is experiencing a 5xx error rate of {{ $value | printf \"%.2f\" }}% (threshold: 5%)."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "on-call-engineer/runbook.md#high-http-error-rate"
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(choresync_http_server_request_duration_seconds_bucket[1m])) by (le)) > 1.0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "High P95 request latency on {{ $labels.service }}"
+          description: "P95 latency on {{ $labels.service }} in {{ $labels.environment }} is {{ $value | printf \"%.2f\" }}s (threshold: 1.0s)."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "on-call-engineer/runbook.md#high-request-latency"
+
+      - alert: DatabaseQueryErrors
+        expr: |
+          sum(rate(choresync_db_query_errors_total[1m])) > 0.05
+        for: 30s
+        labels:
+          severity: critical
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "Database query errors on {{ $labels.service }}"
+          description: "Database queries are failing on {{ $labels.service }} in {{ $labels.environment }} at rate {{ $value | printf \"%.2f\" }} errors/sec."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "on-call-engineer/runbook.md#database-query-errors"

@@ -1,0 +1,73 @@
+name: choresync-prod
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "${PROD_POSTGRES_PORT:-5434}:5432"
+    environment:
+      - POSTGRES_USER=choresync
+      - POSTGRES_PASSWORD=choresync_secret
+      - POSTGRES_DB=choresync
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U choresync -d choresync"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    container_name: choresync-prod-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "${PROD_OTEL_GRPC_PORT:-4320}:4317" # OTLP gRPC receiver
+      - "${PROD_OTEL_HTTP_PORT:-4321}:4318" # OTLP HTTP receiver
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: choresync-backend:prod
+    environment:
+      - PORT=8000
+      - DATABASE_URL=${DATABASE_URL:-postgres://choresync:choresync_secret@postgres:5432/choresync?sslmode=disable}
+      - JWT_SECRET=${JWT_SECRET:-choresync_super_secret_jwt_key_2026}
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-mock}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - OTEL_SERVICE_NAME=api-backend
+      - DEPLOYMENT_ENVIRONMENT=production
+      - SERVICE_VERSION=${SERVICE_VERSION:-prod-latest}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+    depends_on:
+      postgres:
+        condition: service_healthy
+      otel-collector:
+        condition: service_started
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    image: choresync-frontend:prod
+    ports:
+      - "${PROD_PORT:-8088}:80"
+    environment:
+      - PORT=80
+      - BACKEND_URL=backend:8000
+      - OTEL_SERVICE_NAME=caddy-proxy
+      - DEPLOYMENT_ENVIRONMENT=production
+      - SERVICE_VERSION=${SERVICE_VERSION:-prod-latest}
+    depends_on:
+      - backend
+      - otel-collector
+    restart: unless-stopped
+
+volumes:
+  postgres_prod_data:

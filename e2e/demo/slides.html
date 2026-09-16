@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChoreSync: Behind-the-Scenes Architecture & Observability</title>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card: #151d2f;
+      --card-border: #1e293b;
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.2);
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 32px;
+      overflow: hidden;
+    }
+    .slide-container {
+      width: 1200px;
+      height: 660px;
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 40px 48px;
+      position: relative;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+      display: none;
+      flex-direction: column;
+    }
+    .slide-container.active {
+      display: flex;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      border-bottom: 1px solid var(--card-border);
+      padding-bottom: 16px;
+    }
+    .badge {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+      padding: 4px 12px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 800;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 15px;
+      margin-top: 4px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      flex: 1;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 20px;
+      flex: 1;
+    }
+    .panel {
+      background: #0d1322;
+      border: 1px solid #1e293b;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    .panel-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-content {
+      font-size: 13px;
+      line-height: 1.6;
+      color: #cbd5e1;
+      flex: 1;
+    }
+    .panel-content ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    .panel-content li {
+      margin-bottom: 8px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .panel-content li::before {
+      content: "✦";
+      color: var(--accent);
+      font-size: 11px;
+      margin-top: 3px;
+    }
+    .code-box {
+      background: #060911;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      color: #38bdf8;
+      margin-top: 12px;
+      overflow-x: auto;
+    }
+    .flow-step {
+      display: flex;
+      align-items: center;
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      gap: 12px;
+    }
+    .flow-number {
+      background: var(--accent);
+      color: #0b0f19;
+      font-weight: 800;
+      font-size: 12px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .flow-text {
+      font-size: 13px;
+      color: #f1f5f9;
+    }
+    .flow-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 20px;
+      border-top: 1px solid var(--card-border);
+      padding-top: 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .pill {
+      background: rgba(16, 185, 129, 0.15);
+      color: var(--success);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Slide 1: Welcome & Overview -->
+  <div class="slide-container active" id="slide-1">
+    <div class="header">
+      <div>
+        <h1>🚀 ChoreSync: Behind the Scenes</h1>
+        <div class="subtitle">AI-Native Spec-Driven Architecture, Full-Stack Observability & CI/CD Delivery</div>
+      </div>
+      <span class="badge">Architecture Tour</span>
+    </div>
+    <div class="grid-3">
+      <div class="panel">
+        <div class="panel-title">📱 Core Application Stack</div>
+        <div class="panel-content">
+          <ul>
+            <li><strong>Frontend</strong>: React 18 + Vite + TypeScript + Tailwind CSS with Kiosk Tablet Mode and Admin PIN protection</li>
+            <li><strong>Reverse Proxy</strong>: Caddy 2 with dynamic ports, gzip/zstd, security headers, zero-CORS API routing</li>
+            <li><strong>Backend API</strong>: Go 1.22 + Chi Router with HMAC-SHA256 JWT, bcrypt, and embedded auto-migrations</li>
+            <li><strong>Persistence</strong>: PostgreSQL 16 + sqlc type-safe query generation with pgx/v5 driver</li>
+          </ul>
+          <div class="code-box">docker compose up -d (Ports: 3000, 8000, 5433)</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🔭 Standalone LGTM Observability</div>
+        <div class="panel-content">
+          <ul>
+            <li><strong>OTel Collector</strong>: Port 4317/4318 receiving traces, metrics, and structured logs</li>
+            <li><strong>Grafana Tempo</strong>: Distributed trace storage with W3C context propagation down to DB queries</li>
+            <li><strong>Grafana Loki</strong>: High-efficiency structured log aggregation</li>
+            <li><strong>Prometheus</strong>: Metric engine evaluating Golden Signals and actionable symptom-based alerts</li>
+            <li><strong>Grafana Dashboard</strong>: Unified dashboard with dynamic filters</li>
+          </ul>
+          <div class="code-box">observability/docker-compose.yml (Port: 3001)</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🤖 SRE & Two-Stage CI/CD</div>
+        <div class="panel-content">
+          <ul>
+            <li><strong>Alertmanager</strong>: Routing firing alerts directly to on-call receiver webhook on port 5050</li>
+            <li><strong>On-Call System</strong>: Automated payload normalization, incident logging, and reproduction runbook</li>
+            <li><strong>CI/CD Matrix</strong>: 6-stage GitHub Actions verification (Go, Postgres, Vite, OpenAPI, Playwright)</li>
+            <li><strong>Container Delivery</strong>: Decoupled Build & Deploy via GHCR with immutable timestamp tags</li>
+          </ul>
+          <div class="code-box">.github/workflows/ci.yml | promote-to-prod.yml</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>ChoreSync AI-Native Dev Tools Zoomcamp 2026</span>
+      <span>100% Passing Test Suites Across All Tiers</span>
+    </div>
+  </div>
+
+  <!-- Slide 2: Distributed Tracing Architecture -->
+  <div class="slide-container" id="slide-2">
+    <div class="header">
+      <div>
+        <h1>🌐 W3C Distributed Tracing & OpenTelemetry</h1>
+        <div class="subtitle">End-to-End Context Propagation: Frontend ➔ Caddy ➔ Backend API ➔ PostgreSQL</div>
+      </div>
+      <span class="badge">Trace Context Flow</span>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">🔄 Context Propagation Pipeline</div>
+        <div class="panel-content">
+          <div class="flow-step">
+            <div class="flow-number">1</div>
+            <div>
+              <div class="flow-text"><strong>React Web SDK</strong> injects W3C headers</div>
+              <div class="flow-meta">traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-number">2</div>
+            <div>
+              <div class="flow-text"><strong>Caddy 2 Reverse Proxy</strong> preserves & forwards</div>
+              <div class="flow-meta">Propagates traceparent to upstream Go container with zero header stripping</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-number">3</div>
+            <div>
+              <div class="flow-text"><strong>Go Chi Telemetry Middleware</strong> extracts context</div>
+              <div class="flow-meta">Creates server span, injects Golden Attributes, measures latency</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-number">4</div>
+            <div>
+              <div class="flow-text"><strong>PostgreSQL pgx.QueryTracer</strong> wraps SQL queries</div>
+              <div class="flow-meta">Captures parameterized SQL (db.statement), execution time, and DB error spans</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">📐 The Mandatory Golden Triangle</div>
+        <div class="panel-content">
+          <p style="margin-bottom: 12px;">Every single trace span, metric point, and structured log emitted by ANY tier MUST contain three canonical resource attributes:</p>
+          <div class="flow-step">
+            <span class="pill">Attribute 1</span>
+            <div>
+              <div class="flow-text"><strong>service.name</strong></div>
+              <div class="flow-meta">web-frontend, api-backend, caddy-proxy, db-postgres</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="pill">Attribute 2</span>
+            <div>
+              <div class="flow-text"><strong>deployment.environment</strong></div>
+              <div class="flow-meta">development, staging, production (drives Grafana template variables)</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="pill">Attribute 3</span>
+            <div>
+              <div class="flow-text"><strong>service.version</strong></div>
+              <div class="flow-meta">Immutable release tag or YYYYMMDD-HHMMSS-shortsha commit stamp</div>
+            </div>
+          </div>
+          <div class="code-box">Trace Visualizer: Grafana Tempo (:3200) via Grafana Explore (:3001)</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>OpenTelemetry Collector Contrib v0.95.0</span>
+      <span>OTLP gRPC (4317) & HTTP (4318) Receivers</span>
+    </div>
+  </div>
+
+  <!-- Slide 3: Incident Management Architecture -->
+  <div class="slide-container" id="slide-3">
+    <div class="header">
+      <div>
+        <h1>🚨 Actionable Alerting & Autonomous Remediation</h1>
+        <div class="subtitle">Gates 11 & 12: Symptom-Based Alerts, Webhook Normalization & Safety Invariants</div>
+      </div>
+      <span class="badge">Autonomous SRE</span>
+    </div>
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">⚡ Symptom-Based Prometheus Alerts</div>
+        <div class="panel-content">
+          <div class="flow-step">
+            <div>
+              <div class="flow-text"><strong>HighHttpErrorRate (Critical)</strong></div>
+              <div class="flow-meta">5xx error rate > 5% sustained for 30s across incoming HTTP traffic</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div>
+              <div class="flow-text"><strong>HighRequestLatency (Warning)</strong></div>
+              <div class="flow-meta">P95 request latency > 1.0s sustained for 60s</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div>
+              <div class="flow-text"><strong>DatabaseQueryErrors (Critical)</strong></div>
+              <div class="flow-meta">PostgreSQL query failure rate > 0.05 errors/sec sustained for 30s</div>
+            </div>
+          </div>
+          <div class="code-box">Evaluated in Prometheus (:9090) ➔ Routed to Alertmanager (:9093)</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">🛡️ Safety Invariants for Autonomous On-Call Agent</div>
+        <div class="panel-content">
+          <div class="flow-step">
+            <span class="pill" style="background:rgba(239, 68, 68, 0.2);color:#ef4444;">Invariant 1</span>
+            <div>
+              <div class="flow-text"><strong>Reproduction Invariant</strong></div>
+              <div class="flow-meta">Agent is STRICTLY PROHIBITED from modifying source code without first establishing a reproducible failing test case.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="pill" style="background:rgba(245, 158, 11, 0.2);color:#f59e0b;">Invariant 2</span>
+            <div>
+              <div class="flow-text"><strong>Minimal Safe Fix Invariant</strong></div>
+              <div class="flow-meta">Implement the smallest surgical patch that resolves the issue without introducing architectural drift.</div>
+            </div>
+          </div>
+          <div class="flow-step">
+            <span class="pill" style="background:rgba(16, 185, 129, 0.2);color:#10b981;">Invariant 3</span>
+            <div>
+              <div class="flow-text"><strong>Container Regression Verification</strong></div>
+              <div class="flow-meta">Run all unit & E2E tests in containers, verify telemetry recovery, and verify alert transition to RESOLVED.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>On-Call Webhook Receiver: port 5050</span>
+      <span>Normalized Payload Schema: on-call-engineer/payload-schema.json</span>
+    </div>
+  </div>
+
+  <!-- Slide 4: CI/CD Pipeline Architecture -->
+  <div class="slide-container" id="slide-4">
+    <div class="header">
+      <div>
+        <h1>📦 Two-Stage CI/CD & Production Promotion</h1>
+        <div class="subtitle">Gate 8: Decoupled Build vs Deploy, Immutable Tags & Digest Verification</div>
+      </div>
+      <span class="badge">Delivery Matrix</span>
+    </div>
+    <div class="grid-3">
+      <div class="panel">
+        <div class="panel-title">1. Automated CI Gates</div>
+        <div class="panel-content">
+          <ul>
+            <li><strong>Backend CI</strong>: Go 1.22 unit & store tests against live PostgreSQL container</li>
+            <li><strong>Frontend CI</strong>: Strict TypeScript compilation (`tsc`) and Vite production build</li>
+            <li><strong>Contract Audit</strong>: OpenAPI 3.1 schema and endpoint audit</li>
+            <li><strong>E2E Integration</strong>: Containerized Playwright suite (11 user journeys)</li>
+          </ul>
+          <div class="code-box">Trigger: PR or commit push to main</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">2. Decoupled Container Delivery</div>
+        <div class="panel-content">
+          <ul>
+            <li><strong>Build Stage</strong>: Multi-stage Docker build packaging frontend and backend images</li>
+            <li><strong>Immutable Stamp</strong>: Tagged with `YYYYMMDD-HHMMSS-shortsha` + `dev-latest`</li>
+            <li><strong>Deploy Stage</strong>: Runtime Compose (`docker-compose.deploy.yml`) pulls pre-built image with zero compiler overhead</li>
+          </ul>
+          <div class="code-box">make deploy-dev (Pre-built image runtime)</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">3. Manual Prod Promotion</div>
+        <div class="panel-content">
+          <ul>
+            <li><strong>"Build Once, Promote Everywhere"</strong>: Never recompile images for production</li>
+            <li><strong>Digest Verification</strong>: Captures SHA256 immutable digest of running dev container</li>
+            <li><strong>Re-tag & Serve</strong>: Re-tags digest as `prod-latest` and deploys to production cluster</li>
+          </ul>
+          <div class="code-box">make promote-prod (Digest immutability)</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer">
+      <span>GitHub Actions: .github/workflows/ci.yml & promote-to-prod.yml</span>
+      <span>Production Blueprint: render.yaml</span>
+    </div>
+  </div>
+
+  <script>
+    // Simple slide navigation function accessible to Playwright
+    window.goToSlide = function(slideIndex) {
+      document.querySelectorAll('.slide-container').forEach((s, idx) => {
+        if (idx === slideIndex - 1) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+      return true;
+    };
+  </script>
+</body>
+</html>

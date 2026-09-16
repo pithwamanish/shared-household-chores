@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Build & Binary Outputs
+dist/
+build/
+backend/tmp/
+backend/bin/
+tmp/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test & Playwright Reports
+playwright-report/
+test-results/
+e2e/playwright-report/
+e2e/test-results/
+e2e/recordings/
+e2e/*.png
+coverage/
+*.lcov
+
+# Ephemeral On-Call Incidents
+on-call-engineer/incidents/*.json
+!on-call-engineer/incidents/.gitkeep
+
+# Environment Variables & Secrets
+.env
+.env.local
+.env.*.local
+*.pem
+
+# IDE & OS Files
+.DS_Store
+Thumbs.db
+.vscode/
+*.swp
+*.swo
+
+# Git worktrees
+.worktrees/

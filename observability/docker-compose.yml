@@ -1,0 +1,127 @@
+name: observability
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    container_name: observability-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4319}:4317" # OTLP gRPC receiver (4319 avoids collision with host IDEs on 4317)
+      - "${OTEL_HTTP_PORT:-4318}:4318" # OTLP HTTP receiver
+      - "${OTEL_METRICS_PORT:-8889}:8889" # Prometheus metrics exporter
+    depends_on:
+      - tempo
+      - loki
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: observability-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: observability-alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+      - "--storage.path=/alertmanager"
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+  on-call-receiver:
+    image: python:3.11-alpine
+    container_name: observability-on-call-receiver
+    working_dir: /app
+    volumes:
+      - ../on-call-engineer:/app
+    command: ["python3", "-u", "receiver.py"]
+    ports:
+      - "5050:5050"
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+  loki:
+    image: grafana/loki:2.9.4
+    container_name: observability-loki
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    volumes:
+      - ./loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+  tempo:
+    image: grafana/tempo:2.4.1
+    container_name: observability-tempo
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo-config.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "${TEMPO_PORT:-3200}:3200" # Tempo HTTP UI & Query API
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    container_name: observability-grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+    restart: unless-stopped
+    networks:
+      - observability-net
+
+networks:
+  observability-net:
+    name: observability-net
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
+  loki_data:
+  tempo_data:
+  grafana_data:

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ChoreSync On-Call: Headless Agent Invocation Script
+# Packages the latest incident payload with on-call system prompt and runbook context.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ON_CALL_DIR="$(dirname "$SCRIPT_DIR")"
+INCIDENTS_DIR="$ON_CALL_DIR/incidents"
+PROMPT_FILE="$ON_CALL_DIR/prompt.md"
+RUNBOOK_FILE="$ON_CALL_DIR/runbook.md"
+
+echo "=== [ON-CALL] Preparing Autonomous Remediation Session ==="
+
+# Find latest incident file
+LATEST_INCIDENT="$(find "$INCIDENTS_DIR" -name "inc-*.json" | sort -r | head -n 1 || true)"
+
+if [ -z "$LATEST_INCIDENT" ] || [ ! -f "$LATEST_INCIDENT" ]; then
+  echo "Error: No incident found in $INCIDENTS_DIR. Run trigger-test-incident first."
+  exit 1
+fi
+
+echo "Active Incident: $LATEST_INCIDENT"
+cat "$LATEST_INCIDENT"
+echo ""
+echo "=== [ON-CALL AGENT DIRECTIVE] ==="
+echo "1. Read system prompt: $PROMPT_FILE"
+echo "2. Read runbook: $RUNBOOK_FILE"
+echo "3. Enforce Reproduction Invariant: author failing test case before code edits"
+echo "4. Implement minimal safe correction"
+echo "5. Verify tests inside container and verify telemetry recovery"
+echo "=== Ready for Autonomous Agent Dispatch ==="

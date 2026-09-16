@@ -1,0 +1,30 @@
+# ========================================================
+# Stage 1: Build Vite React SPA
+# ========================================================
+FROM node:22-slim AS builder
+
+WORKDIR /app
+
+# Install dependencies with lockfile caching
+COPY package*.json ./
+RUN npm ci || npm install
+
+# Copy source code and build production assets
+COPY . .
+RUN npm run build
+
+# ========================================================
+# Stage 2: Production Web Server & Reverse Proxy (Caddy)
+# ========================================================
+FROM caddy:2-alpine
+
+# Copy compiled static assets from builder
+COPY --from=builder /app/dist /srv
+
+# Copy Caddy configuration
+COPY Caddyfile /etc/caddy/Caddyfile
+
+# Default port is 80 (overridable via $PORT env var)
+EXPOSE 80
+
+CMD ["caddy", "run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]

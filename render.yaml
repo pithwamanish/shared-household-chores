@@ -1,0 +1,59 @@
+# ==============================================================================
+# ChoreSync Render Blueprint Infrastructure-as-Code (render.yaml)
+#
+# Generous Free-Tier Deployment Configuration:
+# - Go Backend: Docker Web Service on Render Free Tier
+# - Database: Hosted Neon PostgreSQL (Serverless, 0.5 GB storage, SSL-enabled)
+# - Frontend: Docker Web Service with Caddy 2 Reverse Proxy or Render Static Site
+# ==============================================================================
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. Go Backend Web Service (Statically-compiled Go 1.22 + sqlc + pgx)
+  #    Option A (Default): Git-backed Docker build
+  #    Option B (Pre-built Image): runtime: image, image: { url: ghcr.io/<org>/backend:prod-latest }
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: choresync-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8000
+      # Neon PostgreSQL Connection URL:
+      # Format: postgresql://[user]:[password]@[neon-hostname]/neondb?sslmode=require
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: EMAIL_PROVIDER
+        value: mock
+      - key: RESEND_API_KEY
+        sync: false
+
+  # ----------------------------------------------------------------------------
+  # 2. Frontend Production Service (Caddy 2 Reverse Proxy + Vite React SPA)
+  # ----------------------------------------------------------------------------
+  - type: web
+    name: choresync-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile.prod
+    dockerContext: ./frontend
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 80
+      # Connects Caddy to the backend web service URL
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: choresync-backend
+          property: host

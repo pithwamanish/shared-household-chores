@@ -1,0 +1,170 @@
+name: Promote Dev Image to Prod
+
+on:
+  workflow_dispatch:
+    inputs:
+      dev_image_tag:
+        description: 'Currently deployed Dev image tag to promote (e.g. "dev-latest" or specific "YYYYMMDD-HHMMSS-shortsha")'
+        required: true
+        default: 'dev-latest'
+      confirm_promotion:
+        description: 'Confirm production promotion: type "promote" to proceed'
+        required: true
+        default: 'promote'
+
+concurrency:
+  group: prod-promotion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  promote-and-serve-prod:
+    name: "Promote Dev Image to Prod & Serve"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate Confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_promotion }}" != "promote" ]; then
+            echo "::error::Promotion cancelled. 'confirm_promotion' must equal 'promote'."
+            exit 1
+          fi
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ------------------------------------------------------------------------
+      # Stage 1: Pull Currently Deployed Dev Image from Registry
+      # ------------------------------------------------------------------------
+      - name: Pull Deployed Dev Images
+        id: pull-dev
+        run: |
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          DEV_TAG="${{ github.event.inputs.dev_image_tag }}"
+          if [ -z "$DEV_TAG" ]; then
+            DEV_TAG="dev-latest"
+          fi
+          
+          BACKEND_DEV_IMG="ghcr.io/${REPO_LOWER}/backend:${DEV_TAG}"
+          FRONTEND_DEV_IMG="ghcr.io/${REPO_LOWER}/frontend:${DEV_TAG}"
+          
+          echo "Pulling currently deployed Dev backend: ${BACKEND_DEV_IMG}"
+          docker pull "${BACKEND_DEV_IMG}"
+          
+          echo "Pulling currently deployed Dev frontend: ${FRONTEND_DEV_IMG}"
+          docker pull "${FRONTEND_DEV_IMG}"
+          
+          # Inspect and capture exact image digests for immutable traceability
+          BACKEND_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${BACKEND_DEV_IMG}" 2>/dev/null || echo "digest-unavailable")
+          FRONTEND_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "${FRONTEND_DEV_IMG}" 2>/dev/null || echo "digest-unavailable")
+          
+          echo "backend_digest=${BACKEND_DIGEST}" >> $GITHUB_OUTPUT
+          echo "frontend_digest=${FRONTEND_DIGEST}" >> $GITHUB_OUTPUT
+          echo "repo_lower=${REPO_LOWER}" >> $GITHUB_ENV
+
+      # ------------------------------------------------------------------------
+      # Stage 2: Re-tag Dev Image for Production & Push to Registry
+      # ------------------------------------------------------------------------
+      - name: Tag & Push Prod Images
+        id: tag-prod
+        run: |
+          REPO_LOWER="${{ env.repo_lower }}"
+          DEV_TAG="${{ github.event.inputs.dev_image_tag }}"
+          if [ -z "$DEV_TAG" ]; then
+            DEV_TAG="dev-latest"
+          fi
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          if [ -z "$SHORT_SHA" ]; then
+            SHORT_SHA=$(git rev-parse --short=7 HEAD 2>/dev/null || echo "prod")
+          fi
+          TIMESTAMP=$(date -u +'%Y%m%d-%H%M%S')
+          PROD_TAG="${TIMESTAMP}-${SHORT_SHA}"
+          
+          BACKEND_DEV_IMG="ghcr.io/${REPO_LOWER}/backend:${DEV_TAG}"
+          FRONTEND_DEV_IMG="ghcr.io/${REPO_LOWER}/frontend:${DEV_TAG}"
+          
+          echo "Promoting Dev image [${DEV_TAG}] to Prod tag: ${PROD_TAG}"
+          
+          # Re-tag and push Backend to prod timestamp (YYYYMMDD-HHMMSS-shortsha), prod-latest, and timestamp-prod
+          docker tag "${BACKEND_DEV_IMG}" "ghcr.io/${REPO_LOWER}/backend:${PROD_TAG}"
+          docker tag "${BACKEND_DEV_IMG}" "ghcr.io/${REPO_LOWER}/backend:${PROD_TAG}-prod"
+          docker tag "${BACKEND_DEV_IMG}" "ghcr.io/${REPO_LOWER}/backend:prod-latest"
+          docker push "ghcr.io/${REPO_LOWER}/backend:${PROD_TAG}"
+          docker push "ghcr.io/${REPO_LOWER}/backend:${PROD_TAG}-prod"
+          docker push "ghcr.io/${REPO_LOWER}/backend:prod-latest"
+          
+          # Re-tag and push Frontend to prod timestamp (YYYYMMDD-HHMMSS-shortsha), prod-latest, and timestamp-prod
+          docker tag "${FRONTEND_DEV_IMG}" "ghcr.io/${REPO_LOWER}/frontend:${PROD_TAG}"
+          docker tag "${FRONTEND_DEV_IMG}" "ghcr.io/${REPO_LOWER}/frontend:${PROD_TAG}-prod"
+          docker tag "${FRONTEND_DEV_IMG}" "ghcr.io/${REPO_LOWER}/frontend:prod-latest"
+          docker push "ghcr.io/${REPO_LOWER}/frontend:${PROD_TAG}"
+          docker push "ghcr.io/${REPO_LOWER}/frontend:${PROD_TAG}-prod"
+          docker push "ghcr.io/${REPO_LOWER}/frontend:prod-latest"
+          
+          echo "prod_tag=${PROD_TAG}" >> $GITHUB_OUTPUT
+          echo "backend_prod=ghcr.io/${REPO_LOWER}/backend:${PROD_TAG}" >> $GITHUB_OUTPUT
+          echo "frontend_prod=ghcr.io/${REPO_LOWER}/frontend:${PROD_TAG}" >> $GITHUB_OUTPUT
+
+      # ------------------------------------------------------------------------
+      # Stage 3: Deploy: Pull Promoted Image & Serve in Production
+      # ------------------------------------------------------------------------
+      - name: Deploy & Serve Promoted Image
+        env:
+          BACKEND_IMAGE: "ghcr.io/${{ env.repo_lower }}/backend:${{ steps.tag-prod.outputs.prod_tag }}"
+          FRONTEND_IMAGE: "ghcr.io/${{ env.repo_lower }}/frontend:${{ steps.tag-prod.outputs.prod_tag }}"
+          PORT: 8088
+        run: |
+          echo "Serving promoted production stack with zero rebuild..."
+          docker compose -f docker-compose.deploy.yml up -d
+          
+          echo "Verifying production containers are running..."
+          docker compose -f docker-compose.deploy.yml ps
+
+      - name: Production Health Check Gate
+        run: |
+          echo "Executing production healthcheck gate..."
+          timeout 60 bash -c 'until curl -fsS http://localhost:8088/healthz > /dev/null; do sleep 2; done'
+          echo "Production environment is healthy and responding with 200 OK!"
+
+      - name: Teardown Test Deployment
+        if: always()
+        run: docker compose -f docker-compose.deploy.yml down
+
+      - name: Trigger Production Cloud Webhook (Optional Render Prod)
+        run: |
+          if [ -n "${{ secrets.RENDER_PROD_DEPLOY_HOOK_URL }}" ]; then
+            echo "Dispatching deployment hook to Render Production..."
+            curl -f -X POST "${{ secrets.RENDER_PROD_DEPLOY_HOOK_URL }}"
+            echo "Render Production deployment hook triggered successfully."
+          elif [ -n "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "Dispatching default Render webhook..."
+            curl -f -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
+            echo "Webhook triggered."
+          else
+            echo "RENDER_PROD_DEPLOY_HOOK_URL not configured. Pre-built images are live on ghcr.io:prod-latest."
+          fi
+
+      # ------------------------------------------------------------------------
+      # Stage 4: Promotion Audit Summary
+      # ------------------------------------------------------------------------
+      - name: Generate Promotion Audit Summary
+        run: |
+          echo "### 🚀 Production Promotion Audit" >> $GITHUB_STEP_SUMMARY
+          echo "| Attribute | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Source Dev Tag** | \`${{ github.event.inputs.dev_image_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Promoted Prod Tag** | \`${{ steps.tag-prod.outputs.prod_tag }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Backend Image** | \`ghcr.io/${{ env.repo_lower }}/backend:prod-latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Frontend Image** | \`ghcr.io/${{ env.repo_lower }}/frontend:prod-latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Promoted By** | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Commit SHA** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Status** | **SUCCESS - SERVING PRODUCTION** ✅ |" >> $GITHUB_STEP_SUMMARY

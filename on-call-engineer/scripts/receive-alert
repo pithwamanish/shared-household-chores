@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ChoreSync On-Call: Receive & Normalize Alert
+# Usage:
+#   ./receive-alert < payload.json
+#   ./receive-alert sample.json
+#   ./receive-alert (defaults to generating a sample HighHttpErrorRate payload)
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ON_CALL_DIR="$(dirname "$SCRIPT_DIR")"
+PAYLOAD_SCHEMA="$ON_CALL_DIR/payload-schema.json"
+RECEIVER_URL="http://localhost:5050/webhook"
+
+echo "=== [ON-CALL] Ingesting Alert Payload ==="
+
+PAYLOAD=""
+if [ -p /dev/stdin ]; then
+  PAYLOAD="$(cat)"
+elif [ $# -ge 1 ] && [ -f "$1" ]; then
+  PAYLOAD="$(cat "$1")"
+else
+  # Default synthetic payload for HighHttpErrorRate
+  PAYLOAD='{
+    "alert": {
+      "name": "HighHttpErrorRate",
+      "state": "firing",
+      "severity": "critical"
+    },
+    "service": {
+      "name": "api-backend",
+      "version": "dev-latest"
+    },
+    "deployment": {
+      "environment": "development"
+    },
+    "metric": {
+      "name": "choresync_http_requests_total",
+      "observed_value": 14.5,
+      "threshold": 5.0,
+      "duration": "1m"
+    },
+    "dashboard_url": "http://localhost:3001/d/overview?var-environment=development",
+    "runbook_url": "on-call-engineer/runbook.md#high-http-error-rate",
+    "timestamp": "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"
+  }'
+fi
+
+# Send to running receiver if available, else process via dockerized python runner
+if curl -s -f "http://localhost:5050/healthz" > /dev/null 2>&1; then
+  echo "Delivering alert payload to active receiver on $RECEIVER_URL..."
+  RESPONSE="$(curl -s -X POST "$RECEIVER_URL" -H "Content-Type: application/json" -d "$PAYLOAD")"
+  echo "Response: $RESPONSE"
+else
+  echo "Active receiver container not running on :5050. Normalizing locally via ephemeral container..."
+  docker run --rm -i \
+    -v "$ON_CALL_DIR":/app \
+    -w /app \
+    python:3.11-alpine \
+    python3 receiver.py --stdin <<< "$PAYLOAD"
+fi
+
+echo "=== [ON-CALL] Alert Ingest Complete ==="

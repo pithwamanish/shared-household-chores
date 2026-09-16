@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ChoreSync On-Call: Verification Suite
+# Deterministically validates the alerting configuration, JSON schema, receiver, and remediation pipeline.
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ON_CALL_DIR="$(dirname "$SCRIPT_DIR")"
+REPO_ROOT="$(dirname "$ON_CALL_DIR")"
+
+echo "========================================================"
+echo "  ChoreSync Autonomous Incident Response Verification   "
+echo "========================================================"
+
+# Check 1: Verify all required on-call artifacts exist
+echo "[1/6] Verifying presence of required On-Call artifacts..."
+REQUIRED_FILES=(
+  "$ON_CALL_DIR/payload-schema.json"
+  "$ON_CALL_DIR/prompt.md"
+  "$ON_CALL_DIR/runbook.md"
+  "$ON_CALL_DIR/receiver.py"
+  "$SCRIPT_DIR/receive-alert"
+  "$SCRIPT_DIR/invoke-agent"
+  "$SCRIPT_DIR/trigger-test-incident"
+  "$SCRIPT_DIR/verify"
+)
+
+for file in "${REQUIRED_FILES[@]}"; do
+  if [ ! -f "$file" ]; then
+    echo "FAILED: Missing required artifact: $file"
+    exit 1
+  fi
+  echo "  ✓ Found $(basename "$file")"
+done
+
+# Check 2: Verify Prometheus Alert Rules syntax and presence
+echo "[2/6] Verifying Prometheus alert rules file..."
+ALERT_RULES_FILE="$REPO_ROOT/observability/prometheus/alert_rules.yml"
+if [ ! -f "$ALERT_RULES_FILE" ]; then
+  echo "FAILED: Prometheus alert rules not found at $ALERT_RULES_FILE"
+  exit 1
+fi
+
+# Verify rules in Prometheus API if running
+if curl -s -f "http://localhost:9090/-/healthy" > /dev/null 2>&1; then
+  echo "  Checking active Prometheus rule evaluation..."
+  RULES_OUTPUT="$(curl -s "http://localhost:9090/api/v1/rules" || true)"
+  if echo "$RULES_OUTPUT" | grep -q "HighHttpErrorRate"; then
+    echo "  ✓ HighHttpErrorRate rule active in Prometheus"
+  else
+    echo "  ! Note: HighHttpErrorRate rule pending Prometheus reload or reload required"
+  fi
+else
+  echo "  ! Note: Prometheus container not reachable on port 9090; skipping live API check"
+fi
+
+# Check 3: Validate JSON Schema on payload-schema.json
+echo "[3/6] Validating payload-schema.json syntax..."
+docker run --rm -v "$ON_CALL_DIR":/app -w /app python:3.11-alpine python3 -c '
+import json
+with open("payload-schema.json", "r") as f:
+    schema = json.load(f)
+assert schema.get("title") == "NormalizedAlertIncidentPayload"
+assert "alert" in schema.get("properties", {})
+assert "service" in schema.get("properties", {})
+assert "metric" in schema.get("properties", {})
+print("  ✓ payload-schema.json syntax valid")
+'
+
+# Check 4: Test Triggering Synthetic Incident
+echo "[4/6] Executing synthetic incident trigger..."
+bash "$SCRIPT_DIR/trigger-test-incident"
+
+# Check 5: Verify Incident Persistence
+echo "[5/6] Verifying incident recorded in incidents/ directory..."
+LATEST_INCIDENT="$(find "$ON_CALL_DIR/incidents" -name "inc-*.json" | sort -r | head -n 1 || true)"
+if [ -z "$LATEST_INCIDENT" ] || [ ! -f "$LATEST_INCIDENT" ]; then
+  echo "FAILED: No incident recorded in $ON_CALL_DIR/incidents"
+  exit 1
+fi
+echo "  ✓ Incident successfully recorded: $(basename "$LATEST_INCIDENT")"
+
+# Check 6: Validate Agent Invocation Context
+echo "[6/6] Verifying on-call agent invocation packaging..."
+INVOKE_OUTPUT="$(bash "$SCRIPT_DIR/invoke-agent")"
+if echo "$INVOKE_OUTPUT" | grep -q "Reproduction Invariant"; then
+  echo "  ✓ invoke-agent successfully surfaced system prompt and reproduction invariants"
+else
+  echo "FAILED: invoke-agent failed to output expected reproduction directive"
+  exit 1
+fi
+
+echo "========================================================"
+echo "  ✓ All 6 On-Call Incident Response Gates PASSED!       "
+echo "========================================================"

@@ -1,0 +1,2204 @@
+openapi: 3.1.0
+info:
+  title: ChoreSync API
+  version: 1.0.0
+  description: >-
+    Frozen Contract-First OpenAPI Specification for ChoreSync - An equitable, flexible
+    household chore coordination system supporting Flatmates, Families, and Couples co-living.
+servers:
+  - url: http://localhost:8000
+    description: Local development backend server
+  - url: https://api.choresync.local
+    description: Production API server
+
+tags:
+  - name: Households
+    description: Household workspace management, settings, and join operations
+  - name: Members
+    description: Household member profiles, roles, and points
+  - name: Chores
+    description: Chore definitions, rotation scheduling, claiming, and lifecycle operations
+  - name: Approvals
+    description: Parent / Admin verification gates for completed chores
+  - name: Swaps
+    description: Peer chore trading and marketplace operations
+  - name: Rewards
+    description: Gamification rewards catalog and redemption management
+  - name: Activity & Social
+    description: Audit trail, activity notifications, nudges, and chore discussions
+  - name: System
+    description: Testing and demo reset operations
+  - name: Auth
+    description: Authentication, Magic Link, and Demo Token management
+
+paths:
+  /api/auth/magic-link:
+    post:
+      tags: [Auth]
+      summary: Request a magic login link or code
+      description: Sends an email with a 1-click magic login link or verification code.
+      operationId: requestMagicLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MagicLinkRequest'
+      responses:
+        '200':
+          description: Magic link generated or dispatched
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Magic link sent to email"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /api/auth/verify:
+    post:
+      tags: [Auth]
+      summary: Verify magic link or verification token
+      description: Verifies token and returns signed JWT access token with member and household claims.
+      operationId: verifyMagicLink
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MagicLinkVerifyRequest'
+      responses:
+        '200':
+          description: Verification successful, JWT token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/auth/demo-login:
+    post:
+      tags: [Auth]
+      summary: Mint JWT for demo persona fast-switch
+      description: Issues a real signed JWT for seed members to enable zero-friction demo reviews.
+      operationId: demoLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DemoLoginRequest'
+      responses:
+        '200':
+          description: Demo token minted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Authenticate user with email and password
+      description: Verifies user credentials and returns signed JWT access token with member and household claims.
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful, JWT token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register new user account
+      description: Creates user account with email and password, creating a new household or joining an existing one.
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Account created successfully, JWT token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '409':
+          description: Account with email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request password reset email
+      description: Issues a password reset token and dispatches an email with reset instructions.
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          description: Password reset email dispatched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForgotPasswordResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /api/auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password with token
+      description: Verifies password reset token, updates password, and returns authenticated JWT session.
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: Password successfully reset, JWT token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+
+  /api/dev/emails:
+    get:
+      tags: [System]
+      summary: Retrieve simulated or sent dev emails
+      description: Returns recent outgoing emails for verification during development and testing.
+      operationId: getDevEmails
+      responses:
+        '200':
+          description: List of recent sent/captured emails
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/DevEmail'
+    delete:
+      tags: [System]
+      summary: Clear dev emails buffer
+      description: Clears in-memory sent emails buffer for clean test setup.
+      operationId: clearDevEmails
+      responses:
+        '200':
+          description: Buffer cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /api/households:
+    get:
+      tags: [Households]
+      summary: List all households
+      description: Returns all households accessible in the workspace.
+      operationId: getHouseholds
+      responses:
+        '200':
+          description: List of households
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Household'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      tags: [Households]
+      summary: Create a new household
+      description: Creates a new household workspace with specified initial settings.
+      operationId: createHousehold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HouseholdCreateRequest'
+      responses:
+        '201':
+          description: Household created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+
+  /api/households/join:
+    post:
+      tags: [Households]
+      summary: Join an existing household
+      description: Joins a household using a unique invite code.
+      operationId: joinHousehold
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HouseholdJoinRequest'
+      responses:
+        '200':
+          description: Joined household successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}:
+    get:
+      tags: [Households]
+      summary: Get household details
+      description: Retrieves a household by its unique identifier.
+      operationId: getHousehold
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: Household details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/settings:
+    patch:
+      tags: [Households]
+      summary: Update household settings
+      description: Updates household configuration preferences (default mode, swap permissions, timezone).
+      operationId: updateHouseholdSettings
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HouseholdSettingsUpdate'
+      responses:
+        '200':
+          description: Updated household details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Household'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/verify-pin:
+    post:
+      tags: [Households]
+      summary: Verify household admin PIN
+      description: Verifies 4-digit PIN for parent/admin gate on shared devices.
+      operationId: verifyHouseholdPIN
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyPINRequest'
+      responses:
+        '200':
+          description: PIN verification successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Admin PIN verified"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/members:
+    get:
+      tags: [Members]
+      summary: List household members
+      description: Returns all members belonging to the specified household.
+      operationId: getMembers
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: List of members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Member'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      tags: [Members]
+      summary: Add member to household
+      description: Adds or invites a new member to the household.
+      operationId: addMember
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MemberCreateRequest'
+      responses:
+        '201':
+          description: Member added successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Member'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/chores:
+    get:
+      tags: [Chores]
+      summary: List household chores
+      description: Queries chores for a household with optional filtering by status, category, view, or search query.
+      operationId: getChores
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ChoreStatus'
+          description: Filter chores by status
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/ChoreCategory'
+          description: Filter chores by category
+        - name: search
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Search term across chore title and description
+        - name: view
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, my, open, approval, overdue]
+          description: Preset view filter
+        - name: assignee_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter by assignee ID (used with view=my)
+      responses:
+        '200':
+          description: Filtered list of chores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Chore'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      tags: [Chores]
+      summary: Create a new chore
+      description: Creates a new chore with assignment strategy, recurrence rules, and verification settings.
+      operationId: createChore
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreCreateRequest'
+      responses:
+        '201':
+          description: Chore created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chore'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/chores/{chore_id}:
+    get:
+      tags: [Chores]
+      summary: Get chore details
+      description: Retrieves complete details for a specific chore by ID.
+      operationId: getChore
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      responses:
+        '200':
+          description: Chore details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chore'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    patch:
+      tags: [Chores]
+      summary: Update chore
+      description: Updates fields of an existing chore definition.
+      operationId: updateChore
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreUpdateRequest'
+      responses:
+        '200':
+          description: Updated chore details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chore'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags: [Chores]
+      summary: Delete chore
+      description: Removes a chore from the household board.
+      operationId: deleteChore
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      responses:
+        '200':
+          description: Chore deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/chores/{chore_id}/claim:
+    post:
+      tags: [Chores]
+      summary: Claim open pool chore
+      description: Assigns an unassigned or open-pool chore to the requesting member.
+      operationId: claimChore
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreClaimRequest'
+      responses:
+        '200':
+          description: Chore claimed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chore'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/chores/{chore_id}/complete:
+    post:
+      tags: [Chores]
+      summary: Mark chore completed
+      description: >-
+        Submits completion for a chore. If requires_approval is false, marks completed immediately
+        and awards points. If requires_approval is true, places completion into pending_approval status.
+      operationId: completeChore
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreCompleteRequest'
+      responses:
+        '200':
+          description: Completion result with chore state and points awarded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoreCompleteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/chores/{chore_id}/swap:
+    post:
+      tags: [Swaps]
+      summary: Propose swap for chore
+      description: Proposes trading an assigned chore to a designated peer or onto the household swap board.
+      operationId: requestChoreSwap
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreSwapCreateRequest'
+      responses:
+        '201':
+          description: Swap request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoreSwapRequest'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/chores/{chore_id}/nudge:
+    post:
+      tags: [Activity & Social]
+      summary: Send gentle reminder nudge
+      description: Sends a friendly reminder notification to the current assignee or open pool.
+      operationId: sendNudge
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreNudgeRequest'
+      responses:
+        '200':
+          description: Nudge sent successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoreNudgeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/chores/{chore_id}/comments:
+    get:
+      tags: [Activity & Social]
+      summary: Get comments for chore
+      description: Retrieves all discussion comments posted on a chore.
+      operationId: getComments
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      responses:
+        '200':
+          description: List of comments with author information
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChoreCommentWithMember'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      tags: [Activity & Social]
+      summary: Add comment to chore
+      description: Posts a comment or question to a chore's comment feed.
+      operationId: addComment
+      parameters:
+        - $ref: '#/components/parameters/ChoreIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoreCommentCreateRequest'
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoreComment'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/approvals:
+    get:
+      tags: [Approvals]
+      summary: List pending chore approvals
+      description: Returns all chore completions awaiting parent/admin verification in the household.
+      operationId: getPendingApprovals
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: List of pending completions with chore and member context
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PendingApprovalItem'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/completions/{completion_id}/approve:
+    post:
+      tags: [Approvals]
+      summary: Approve chore completion
+      description: Admin approves a completed chore, awarding effort points and advancing rotation/recurrence.
+      operationId: approveChore
+      parameters:
+        - $ref: '#/components/parameters/CompletionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApproveCompletionRequest'
+      responses:
+        '200':
+          description: Chore approved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/completions/{completion_id}/reject:
+    post:
+      tags: [Approvals]
+      summary: Reject chore completion
+      description: Admin rejects a completion with feedback; chore reverts to assigned status for rework.
+      operationId: rejectChore
+      parameters:
+        - $ref: '#/components/parameters/CompletionIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RejectCompletionRequest'
+      responses:
+        '200':
+          description: Chore completion rejected and returned for rework
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/swaps:
+    get:
+      tags: [Swaps]
+      summary: List household chore swaps
+      description: Retrieves all active and historical swap requests for a household.
+      operationId: getSwaps
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: List of swap requests with chore and member details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SwapItem'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/swaps:
+    post:
+      tags: [Swaps]
+      summary: Create swap request
+      description: Proposes a new chore swap.
+      operationId: createSwap
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwapCreateRequest'
+      responses:
+        '201':
+          description: Swap request created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChoreSwapRequest'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/swaps/{swap_id}/accept:
+    post:
+      tags: [Swaps]
+      summary: Accept chore swap
+      description: Target peer or housemate accepts a swap request; assignee responsibility transfers immediately.
+      operationId: acceptSwap
+      parameters:
+        - $ref: '#/components/parameters/SwapIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SwapAcceptRequest'
+      responses:
+        '200':
+          description: Swap accepted and chore reassigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/swaps/{swap_id}/reject:
+    post:
+      tags: [Swaps]
+      summary: Reject chore swap
+      description: Rejects a proposed chore swap request.
+      operationId: rejectSwap
+      parameters:
+        - $ref: '#/components/parameters/SwapIdParam'
+      responses:
+        '200':
+          description: Swap rejected successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/swaps/{swap_id}:
+    delete:
+      tags: [Swaps]
+      summary: Cancel chore swap
+      description: Requester cancels a previously proposed swap request.
+      operationId: cancelSwap
+      parameters:
+        - $ref: '#/components/parameters/SwapIdParam'
+      responses:
+        '200':
+          description: Swap cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/rewards:
+    get:
+      tags: [Rewards]
+      summary: List household rewards
+      description: Retrieves active rewards catalog for the household.
+      operationId: getRewards
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: List of available rewards
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RewardItem'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    post:
+      tags: [Rewards]
+      summary: Create reward item
+      description: Adds a new reward to the household catalog.
+      operationId: createReward
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewardItemCreateRequest'
+      responses:
+        '201':
+          description: Reward item created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RewardItem'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/rewards/{reward_id}/redeem:
+    post:
+      tags: [Rewards]
+      summary: Redeem reward
+      description: Member spends points to claim a reward item.
+      operationId: redeemReward
+      parameters:
+        - $ref: '#/components/parameters/RewardIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RewardRedeemRequest'
+      responses:
+        '201':
+          description: Reward redeemed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RewardRedemption'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/redemptions/{redemption_id}/fulfill:
+    post:
+      tags: [Rewards]
+      summary: Fulfill reward redemption
+      description: Admin marks a requested reward redemption as delivered / fulfilled.
+      operationId: fulfillReward
+      parameters:
+        - $ref: '#/components/parameters/RedemptionIdParam'
+      responses:
+        '200':
+          description: Reward redemption fulfilled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/redemptions:
+    get:
+      tags: [Rewards]
+      summary: List household reward redemptions
+      description: Retrieves all reward redemption claims with reward and member details.
+      operationId: getRedemptions
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: List of redemptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RewardRedemptionItem'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/households/{household_id}/activity:
+    get:
+      tags: [Activity & Social]
+      summary: List household activity log
+      description: Retrieves timeline of chore, swap, approval, and reward events.
+      operationId: getActivities
+      parameters:
+        - $ref: '#/components/parameters/HouseholdIdParam'
+      responses:
+        '200':
+          description: List of activity logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ActivityLog'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+  /api/reset:
+    post:
+      tags: [System]
+      summary: Reset demo data
+      description: Resets database or store back to initial seed data for demonstration and testing.
+      operationId: resetDemoData
+      responses:
+        '200':
+          description: System reset successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token encoding member_id, household_id, and role claims.
+
+  parameters:
+    HouseholdIdParam:
+      name: household_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Household unique identifier
+
+    ChoreIdParam:
+      name: chore_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Chore unique identifier
+
+    CompletionIdParam:
+      name: completion_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Completion record unique identifier
+
+    SwapIdParam:
+      name: swap_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Swap request unique identifier
+
+    RewardIdParam:
+      name: reward_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Reward item unique identifier
+
+    RedemptionIdParam:
+      name: redemption_id
+      in: path
+      required: true
+      schema:
+        type: string
+      description: Reward redemption unique identifier
+
+  responses:
+    BadRequestError:
+      description: Bad request or validation failure
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "BAD_REQUEST"
+            message: "Title is required and cannot be empty"
+            code: 400
+            details: {}
+
+    UnauthorizedError:
+      description: Missing, invalid, or expired authentication token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "UNAUTHORIZED"
+            message: "Missing or invalid Bearer authentication token"
+            code: 401
+            details: {}
+
+    ForbiddenError:
+      description: Insufficient role permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "FORBIDDEN"
+            message: "Admin privileges required to approve or reject chores"
+            code: 403
+            details: {}
+
+    NotFoundError:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "RESOURCE_NOT_FOUND"
+            message: "Chore with ID c-123 was not found in household h-roommates"
+            code: 404
+            details: {}
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "INTERNAL_ERROR"
+            message: "An unexpected error occurred"
+            code: 500
+            details: {}
+
+  schemas:
+    HouseholdMode:
+      type: string
+      enum: [flatmate, family, casual]
+      description: Living arrangement mode
+
+    MemberRole:
+      type: string
+      enum: [admin, member, child]
+      description: Role within the household
+
+    ChoreCategory:
+      type: string
+      enum: [cleaning, kitchen, yard, pets, maintenance, other]
+      description: Category of the chore
+
+    ChoreAssignmentType:
+      type: string
+      enum: [direct, round_robin, open_pool]
+      description: Assignment strategy for the chore
+
+    ChoreRecurrenceType:
+      type: string
+      enum: [none, daily, weekly, monthly, custom_days]
+      description: Recurrence cadence
+
+    ChoreRecurrenceRule:
+      type: object
+      properties:
+        days:
+          type: array
+          items:
+            type: string
+          example: ["mon", "thu"]
+
+    ChoreStatus:
+      type: string
+      enum: [unassigned, assigned, in_progress, pending_approval, completed, overdue]
+      description: Current lifecycle state of the chore
+
+    CompletionStatus:
+      type: string
+      enum: [approved, rejected, pending_approval]
+      description: Status of a completion submission
+
+    SwapStatus:
+      type: string
+      enum: [pending, accepted, rejected, cancelled]
+      description: Status of a chore swap request
+
+    RedemptionStatus:
+      type: string
+      enum: [requested, fulfilled, cancelled]
+      description: Status of a reward redemption
+
+    ActivityEventType:
+      type: string
+      enum:
+        - chore_created
+        - chore_assigned
+        - chore_completed
+        - approval_requested
+        - chore_approved
+        - chore_rejected
+        - swap_proposed
+        - swap_accepted
+        - chore_nudge
+        - reward_redeemed
+        - reward_fulfilled
+
+    HouseholdSettings:
+      type: object
+      required:
+        - default_mode
+        - allow_swaps
+        - timezone
+      properties:
+        default_mode:
+          $ref: '#/components/schemas/HouseholdMode'
+        allow_swaps:
+          type: boolean
+        timezone:
+          type: string
+          example: "America/New_York"
+        admin_pin:
+          type: string
+          description: Optional 4-digit PIN for parent/admin approval on shared devices
+          example: "1234"
+
+    HouseholdSettingsUpdate:
+      type: object
+      properties:
+        default_mode:
+          $ref: '#/components/schemas/HouseholdMode'
+        allow_swaps:
+          type: boolean
+        timezone:
+          type: string
+        admin_pin:
+          type: string
+          description: Optional 4-digit PIN for parent/admin approval on shared devices
+          example: "1234"
+
+    AuthTokenResponse:
+      type: object
+      required:
+        - access_token
+        - token_type
+        - expires_in
+        - member
+        - household
+      properties:
+        access_token:
+          type: string
+          description: Signed JWT access token
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          description: Token lifespan in seconds
+          example: 86400
+        member:
+          $ref: '#/components/schemas/Member'
+        household:
+          $ref: '#/components/schemas/Household'
+
+    MagicLinkRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: "sarah@example.com"
+
+    MagicLinkVerifyRequest:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: Magic link token or 6-digit verification code
+          example: "MAGIC-123456"
+
+    DemoLoginRequest:
+      type: object
+      required:
+        - member_id
+      properties:
+        member_id:
+          type: string
+          description: Seed member ID for demo fast-switching
+          example: "m-sarah"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: sarah@example.com
+        password:
+          type: string
+          format: password
+          example: password123
+
+    RegisterRequest:
+      type: object
+      required:
+        - name
+        - email
+        - password
+      properties:
+        name:
+          type: string
+          example: Jordan Lee
+        email:
+          type: string
+          format: email
+          example: jordan@example.com
+        password:
+          type: string
+          format: password
+          example: password123
+        household_name:
+          type: string
+          example: Apartment 4B
+        invite_code:
+          type: string
+          example: ROOMIES-4B
+        role:
+          type: string
+          enum: [admin, member, child]
+          default: member
+
+    VerifyPINRequest:
+      type: object
+      required:
+        - pin
+      properties:
+        pin:
+          type: string
+          pattern: '^[0-9]{4}$'
+          example: "1234"
+
+    ForgotPasswordRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: sarah@example.com
+
+    ForgotPasswordResponse:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          example: "Password reset link sent to sarah@example.com"
+        token:
+          type: string
+          description: Provided in development/test environment for automated verification
+          example: "RST-123456"
+
+    ResetPasswordRequest:
+      type: object
+      required:
+        - token
+        - new_password
+      properties:
+        token:
+          type: string
+          example: "RST-123456"
+        new_password:
+          type: string
+          format: password
+          example: newpassword123
+
+    DevEmail:
+      type: object
+      required:
+        - id
+        - to
+        - subject
+        - type
+        - sent_at
+      properties:
+        id:
+          type: string
+          example: "email-1"
+        to:
+          type: string
+          example: "sarah@example.com"
+        to_name:
+          type: string
+          example: "Sarah Chen"
+        from:
+          type: string
+          example: "ChoreSync <notifications@choresync.app>"
+        subject:
+          type: string
+          example: "Reset your ChoreSync password"
+        text_body:
+          type: string
+        html_body:
+          type: string
+        type:
+          type: string
+          enum: [magic_link, password_reset, chore_reminder, chore_assigned]
+          example: "password_reset"
+        sent_at:
+          type: string
+          format: date-time
+        provider:
+          type: string
+          example: "mock"
+
+    Household:
+      type: object
+      required:
+        - id
+        - name
+        - invite_code
+        - settings
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          example: "h-roommates"
+        name:
+          type: string
+          example: "Apartment 4B"
+        invite_code:
+          type: string
+          example: "APT4B-SHARE"
+        settings:
+          $ref: '#/components/schemas/HouseholdSettings'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    HouseholdCreateRequest:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Apartment 4B"
+        default_mode:
+          $ref: '#/components/schemas/HouseholdMode'
+        allow_swaps:
+          type: boolean
+          default: true
+        timezone:
+          type: string
+          default: "America/New_York"
+
+    HouseholdJoinRequest:
+      type: object
+      required:
+        - invite_code
+      properties:
+        invite_code:
+          type: string
+          example: "APT4B-SHARE"
+
+    Member:
+      type: object
+      required:
+        - id
+        - household_id
+        - name
+        - role
+        - points_balance
+        - total_points_earned
+        - streak
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          example: "m-sarah"
+        household_id:
+          type: string
+          example: "h-roommates"
+        name:
+          type: string
+          example: "Sarah Chen"
+        avatar_url:
+          type: string
+          nullable: true
+          example: "https://images.unsplash.com/photo-1534528741775-53994a69daeb"
+        role:
+          $ref: '#/components/schemas/MemberRole'
+        points_balance:
+          type: integer
+          example: 145
+        total_points_earned:
+          type: integer
+          example: 420
+        streak:
+          type: integer
+          example: 6
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    MemberCreateRequest:
+      type: object
+      required:
+        - name
+        - role
+      properties:
+        name:
+          type: string
+          example: "Leo (10y)"
+        role:
+          $ref: '#/components/schemas/MemberRole'
+        avatar_url:
+          type: string
+          nullable: true
+
+    Chore:
+      type: object
+      required:
+        - id
+        - household_id
+        - title
+        - category
+        - effort_points
+        - assignment_type
+        - recurrence_type
+        - requires_approval
+        - requires_proof
+        - status
+        - created_by
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          example: "c-recycling-rr"
+        household_id:
+          type: string
+          example: "h-roommates"
+        title:
+          type: string
+          example: "Recycling & Garbage to Curb"
+        description:
+          type: string
+          nullable: true
+          example: "Separate glass, plastic, and cardboard. Roll bins to curb by 8 PM Tuesday."
+        category:
+          $ref: '#/components/schemas/ChoreCategory'
+        effort_points:
+          type: integer
+          example: 20
+        assignment_type:
+          $ref: '#/components/schemas/ChoreAssignmentType'
+        current_assignee_id:
+          type: string
+          nullable: true
+          example: "m-liam"
+        rotation_member_ids:
+          type: array
+          items:
+            type: string
+          nullable: true
+          example: ["m-sarah", "m-liam", "m-maya", "m-noah"]
+        current_rotation_index:
+          type: integer
+          nullable: true
+          example: 1
+        recurrence_type:
+          $ref: '#/components/schemas/ChoreRecurrenceType'
+        recurrence_rule:
+          $ref: '#/components/schemas/ChoreRecurrenceRule'
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        requires_approval:
+          type: boolean
+          example: false
+        requires_proof:
+          type: boolean
+          example: false
+        status:
+          $ref: '#/components/schemas/ChoreStatus'
+        created_by:
+          type: string
+          example: "m-sarah"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ChoreCreateRequest:
+      type: object
+      required:
+        - household_id
+        - title
+        - category
+        - effort_points
+        - assignment_type
+        - recurrence_type
+        - requires_approval
+        - requires_proof
+        - created_by
+      properties:
+        household_id:
+          type: string
+          example: "h-roommates"
+        title:
+          type: string
+          example: "Wipe Down Kitchen Hood & Filters"
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/ChoreCategory'
+        effort_points:
+          type: integer
+          example: 30
+        assignment_type:
+          $ref: '#/components/schemas/ChoreAssignmentType'
+        current_assignee_id:
+          type: string
+          nullable: true
+        rotation_member_ids:
+          type: array
+          items:
+            type: string
+          nullable: true
+        current_rotation_index:
+          type: integer
+          default: 0
+        recurrence_type:
+          $ref: '#/components/schemas/ChoreRecurrenceType'
+        recurrence_rule:
+          $ref: '#/components/schemas/ChoreRecurrenceRule'
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        requires_approval:
+          type: boolean
+          default: false
+        requires_proof:
+          type: boolean
+          default: false
+        status:
+          $ref: '#/components/schemas/ChoreStatus'
+        created_by:
+          type: string
+          example: "m-sarah"
+
+    ChoreUpdateRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        category:
+          $ref: '#/components/schemas/ChoreCategory'
+        effort_points:
+          type: integer
+        assignment_type:
+          $ref: '#/components/schemas/ChoreAssignmentType'
+        current_assignee_id:
+          type: string
+          nullable: true
+        rotation_member_ids:
+          type: array
+          items:
+            type: string
+        current_rotation_index:
+          type: integer
+        recurrence_type:
+          $ref: '#/components/schemas/ChoreRecurrenceType'
+        recurrence_rule:
+          $ref: '#/components/schemas/ChoreRecurrenceRule'
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+        requires_approval:
+          type: boolean
+        requires_proof:
+          type: boolean
+        status:
+          $ref: '#/components/schemas/ChoreStatus'
+
+    ChoreClaimRequest:
+      type: object
+      required:
+        - member_id
+      properties:
+        member_id:
+          type: string
+          example: "m-sarah"
+
+    ChoreCompleteRequest:
+      type: object
+      required:
+        - member_id
+      properties:
+        member_id:
+          type: string
+          example: "m-liam"
+        proof_notes:
+          type: string
+          example: "Degreaser applied, soaked filters for 30 mins, reinstalled."
+        proof_photo_url:
+          type: string
+          example: "https://images.unsplash.com/photo-1581578731548-c64695cc6952"
+
+    ChoreCompleteResponse:
+      type: object
+      required:
+        - chore
+        - pointsAwarded
+      properties:
+        chore:
+          $ref: '#/components/schemas/Chore'
+        completion:
+          $ref: '#/components/schemas/ChoreCompletion'
+        pointsAwarded:
+          type: integer
+          example: 30
+
+    ChoreCompletion:
+      type: object
+      required:
+        - id
+        - chore_id
+        - household_id
+        - member_id
+        - status
+        - points_awarded
+        - completed_at
+      properties:
+        id:
+          type: string
+          example: "comp-1"
+        chore_id:
+          type: string
+          example: "c-kitchen-hood"
+        household_id:
+          type: string
+          example: "h-roommates"
+        member_id:
+          type: string
+          example: "m-liam"
+        status:
+          $ref: '#/components/schemas/CompletionStatus'
+        proof_notes:
+          type: string
+          nullable: true
+        proof_photo_url:
+          type: string
+          nullable: true
+        approved_by:
+          type: string
+          nullable: true
+        rejection_reason:
+          type: string
+          nullable: true
+        points_awarded:
+          type: integer
+          example: 30
+        completed_at:
+          type: string
+          format: date-time
+        verified_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    PendingApprovalItem:
+      type: object
+      required:
+        - completion
+        - chore
+        - member
+      properties:
+        completion:
+          $ref: '#/components/schemas/ChoreCompletion'
+        chore:
+          $ref: '#/components/schemas/Chore'
+        member:
+          $ref: '#/components/schemas/Member'
+
+    ApproveCompletionRequest:
+      type: object
+      required:
+        - admin_member_id
+      properties:
+        admin_member_id:
+          type: string
+          example: "m-sarah"
+
+    RejectCompletionRequest:
+      type: object
+      required:
+        - admin_member_id
+        - reason
+      properties:
+        admin_member_id:
+          type: string
+          example: "m-sarah"
+        reason:
+          type: string
+          example: "Please make sure closet doors are also closed!"
+
+    ChoreSwapRequest:
+      type: object
+      required:
+        - id
+        - household_id
+        - chore_id
+        - requester_id
+        - status
+        - created_at
+      properties:
+        id:
+          type: string
+          example: "swap-1"
+        household_id:
+          type: string
+          example: "h-roommates"
+        chore_id:
+          type: string
+          example: "c-recycling-rr"
+        requester_id:
+          type: string
+          example: "m-liam"
+        target_member_id:
+          type: string
+          nullable: true
+          example: "m-maya"
+        status:
+          $ref: '#/components/schemas/SwapStatus'
+        reason:
+          type: string
+          nullable: true
+          example: "Final exams on Tuesday evening, can take your weekend chore in return."
+        created_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    ChoreSwapCreateRequest:
+      type: object
+      required:
+        - requester_id
+      properties:
+        requester_id:
+          type: string
+          example: "m-liam"
+        target_member_id:
+          type: string
+          nullable: true
+          example: "m-maya"
+        reason:
+          type: string
+          example: "Final exams on Tuesday evening"
+
+    SwapCreateRequest:
+      type: object
+      required:
+        - chore_id
+        - requester_id
+      properties:
+        chore_id:
+          type: string
+          example: "c-recycling-rr"
+        requester_id:
+          type: string
+          example: "m-liam"
+        target_member_id:
+          type: string
+          nullable: true
+          example: "m-maya"
+        reason:
+          type: string
+          example: "Final exams on Tuesday evening"
+
+    SwapAcceptRequest:
+      type: object
+      required:
+        - acceptor_member_id
+      properties:
+        acceptor_member_id:
+          type: string
+          example: "m-maya"
+
+    SwapItem:
+      type: object
+      required:
+        - swap
+        - chore
+        - requester
+      properties:
+        swap:
+          $ref: '#/components/schemas/ChoreSwapRequest'
+        chore:
+          $ref: '#/components/schemas/Chore'
+        requester:
+          $ref: '#/components/schemas/Member'
+        targetMember:
+          $ref: '#/components/schemas/Member'
+          nullable: true
+
+    RewardItem:
+      type: object
+      required:
+        - id
+        - household_id
+        - title
+        - description
+        - points_cost
+        - is_active
+      properties:
+        id:
+          type: string
+          example: "rew-room-movie"
+        household_id:
+          type: string
+          example: "h-roommates"
+        title:
+          type: string
+          example: "Pick Apartment Movie Night Film"
+        description:
+          type: string
+          example: "Total control over Friday feature movie + house buys popcorn"
+        points_cost:
+          type: integer
+          example: 50
+        icon:
+          type: string
+          example: "Film"
+        is_active:
+          type: boolean
+          example: true
+
+    RewardItemCreateRequest:
+      type: object
+      required:
+        - title
+        - description
+        - points_cost
+      properties:
+        title:
+          type: string
+          example: "Pick Apartment Movie Night Film"
+        description:
+          type: string
+          example: "Total control over Friday feature movie"
+        points_cost:
+          type: integer
+          example: 50
+        icon:
+          type: string
+          default: "Gift"
+
+    RewardRedeemRequest:
+      type: object
+      required:
+        - member_id
+      properties:
+        member_id:
+          type: string
+          example: "m-maya"
+
+    RewardRedemption:
+      type: object
+      required:
+        - id
+        - household_id
+        - member_id
+        - reward_item_id
+        - points_spent
+        - status
+        - requested_at
+      properties:
+        id:
+          type: string
+          example: "red-1"
+        household_id:
+          type: string
+          example: "h-roommates"
+        member_id:
+          type: string
+          example: "m-maya"
+        reward_item_id:
+          type: string
+          example: "rew-room-movie"
+        points_spent:
+          type: integer
+          example: 50
+        status:
+          $ref: '#/components/schemas/RedemptionStatus'
+        requested_at:
+          type: string
+          format: date-time
+        fulfilled_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    RewardRedemptionItem:
+      type: object
+      required:
+        - redemption
+        - reward
+        - member
+      properties:
+        redemption:
+          $ref: '#/components/schemas/RewardRedemption'
+        reward:
+          $ref: '#/components/schemas/RewardItem'
+        member:
+          $ref: '#/components/schemas/Member'
+
+    ActivityLog:
+      type: object
+      required:
+        - id
+        - household_id
+        - actor_id
+        - event_type
+        - entity_type
+        - entity_id
+        - message
+        - read
+        - created_at
+      properties:
+        id:
+          type: string
+          example: "act-1"
+        household_id:
+          type: string
+          example: "h-roommates"
+        recipient_id:
+          type: string
+          nullable: true
+          example: "m-liam"
+        actor_id:
+          type: string
+          example: "m-sarah"
+        event_type:
+          $ref: '#/components/schemas/ActivityEventType'
+        entity_type:
+          type: string
+          enum: [chore, swap, reward]
+          example: "chore"
+        entity_id:
+          type: string
+          example: "c-recycling-rr"
+        message:
+          type: string
+          example: "Sarah Chen completed 'Deep Clean Kitchen Counters & Stovetop' (+25 pts)"
+        read:
+          type: boolean
+          example: false
+        created_at:
+          type: string
+          format: date-time
+
+    ChoreNudgeRequest:
+      type: object
+      required:
+        - sender_member_id
+      properties:
+        sender_member_id:
+          type: string
+          example: "m-sarah"
+
+    ChoreNudgeResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Friendly nudge from Sarah Chen to Liam Vance: 'Vacuum Living Room & Dust Shelves' is due soon!"
+        email_dispatched:
+          type: boolean
+          example: true
+
+    ChoreComment:
+      type: object
+      required:
+        - id
+        - chore_id
+        - member_id
+        - message
+        - created_at
+      properties:
+        id:
+          type: string
+          example: "comm-1"
+        chore_id:
+          type: string
+          example: "c-recycling-rr"
+        member_id:
+          type: string
+          example: "m-liam"
+        message:
+          type: string
+          example: "I can take this out tomorrow morning before 8 AM."
+        created_at:
+          type: string
+          format: date-time
+
+    ChoreCommentWithMember:
+      type: object
+      required:
+        - comment
+      properties:
+        comment:
+          $ref: '#/components/schemas/ChoreComment'
+        member:
+          $ref: '#/components/schemas/Member'
+          nullable: true
+
+    ChoreCommentCreateRequest:
+      type: object
+      required:
+        - member_id
+        - message
+      properties:
+        member_id:
+          type: string
+          example: "m-liam"
+        message:
+          type: string
+          example: "I will handle this tonight!"
+
+    SuccessResponse:
+      type: object
+      required:
+        - success
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - code
+      properties:
+        error:
+          type: string
+          example: "RESOURCE_NOT_FOUND"
+        message:
+          type: string
+          example: "Chore with ID c-123 was not found in household h-roommates"
+        code:
+          type: integer
+          example: 404
+        details:
+          type: object
+          additionalProperties: true
+          example: {}

@@ -1,0 +1,84 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    environment:
+      - POSTGRES_USER=choresync
+      - POSTGRES_PASSWORD=choresync_secret
+      - POSTGRES_DB=choresync
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U choresync -d choresync"]
+      interval: 2s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - /go/pkg/mod
+    environment:
+      - PORT=8000
+      - DATABASE_URL=postgres://choresync:choresync_secret@postgres:5432/choresync?sslmode=disable
+      - OTEL_SERVICE_NAME=api-backend
+      - DEPLOYMENT_ENVIRONMENT=development
+      - SERVICE_VERSION=dev-latest
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://observability-otel-collector:4318
+    networks:
+      - default
+      - observability-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_OTEL_SERVICE_NAME=web-frontend
+      - VITE_APP_ENV=development
+      - VITE_APP_VERSION=dev-latest
+      - VITE_OTEL_EXPORTER_URL=http://localhost:4318/v1/traces
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  e2e:
+    build:
+      context: ./e2e
+      dockerfile: Dockerfile
+    network_mode: "host"
+    volumes:
+      - ./e2e:/app
+      - /app/node_modules
+    environment:
+      - BASE_URL=http://localhost:3000
+    depends_on:
+      - backend
+      - frontend
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+  observability-net:
+    name: observability-net
+    external: true
