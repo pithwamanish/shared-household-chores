@@ -29,6 +29,66 @@ type Config struct {
 	Headers     map[string]string
 }
 
+// ParseHeaders parses comma-separated headers in either key=value or key: value format,
+// safely handling base64 padding, quotes, and space-prefixed basic/bearer tokens.
+func ParseHeaders(rawHeaders string) map[string]string {
+	headers := make(map[string]string)
+	rawHeaders = strings.Trim(strings.TrimSpace(rawHeaders), "\"'")
+	if rawHeaders == "" {
+		return headers
+	}
+
+	for _, part := range strings.Split(rawHeaders, ",") {
+		part = strings.TrimSpace(part)
+		part = strings.Trim(part, "\"'")
+		if part == "" {
+			continue
+		}
+
+		var key, val string
+		idxColon := strings.Index(part, ":")
+		idxEq := strings.Index(part, "=")
+
+		// A valid HTTP header name cannot contain whitespace
+		validKey := func(s string) bool {
+			return len(s) > 0 && !strings.ContainsAny(s, " \t\r\n")
+		}
+
+		if idxColon != -1 && validKey(strings.TrimSpace(part[:idxColon])) && (idxEq == -1 || idxColon < idxEq) {
+			key = strings.TrimSpace(part[:idxColon])
+			val = strings.TrimSpace(part[idxColon+1:])
+		} else if idxEq != -1 && validKey(strings.TrimSpace(part[:idxEq])) {
+			key = strings.TrimSpace(part[:idxEq])
+			val = strings.TrimSpace(part[idxEq+1:])
+		} else if strings.HasPrefix(strings.ToLower(part), "basic ") || strings.HasPrefix(strings.ToLower(part), "bearer ") {
+			key = "Authorization"
+			val = part
+		}
+
+		val = strings.Trim(val, "\"'")
+		if key != "" && val != "" {
+			headers[key] = val
+		}
+	}
+
+	return headers
+}
+
+// NormalizeOTLPPath ensures the URL path is appropriately formatted for OTLP HTTP endpoints.
+// For Grafana Cloud endpoints, it ensures the required /otlp prefix is present.
+func NormalizeOTLPPath(rawPath, defaultSubpath string, isGrafana bool) string {
+	path := strings.TrimSuffix(rawPath, "/")
+	if isGrafana && !strings.HasPrefix(path, "/otlp") {
+		path = "/otlp" + path
+	}
+	if strings.HasSuffix(path, "/v1/traces") {
+		path = strings.TrimSuffix(path, "/v1/traces")
+	} else if strings.HasSuffix(path, "/v1/metrics") {
+		path = strings.TrimSuffix(path, "/v1/metrics")
+	}
+	return strings.TrimSuffix(path, "/") + defaultSubpath
+}
+
 // LoadConfigFromEnv reads OpenTelemetry settings from environment variables with safe defaults.
 func LoadConfigFromEnv() Config {
 	serviceName := os.Getenv("OTEL_SERVICE_NAME")
@@ -57,28 +117,11 @@ func LoadConfigFromEnv() Config {
 		endpoint = "http://otel-collector:4318"
 	}
 
-	headers := make(map[string]string)
 	rawHeaders := os.Getenv("OTEL_EXPORTER_OTLP_HEADERS")
 	if rawHeaders == "" {
 		rawHeaders = os.Getenv("OTEL_EXPORTER_OTLP_TRACES_HEADERS")
 	}
-	if rawHeaders != "" {
-		for _, part := range strings.Split(rawHeaders, ",") {
-			part = strings.TrimSpace(part)
-			part = strings.Trim(part, "\"'")
-			var key, val string
-			if idx := strings.Index(part, "="); idx != -1 {
-				key = strings.TrimSpace(part[:idx])
-				val = strings.TrimSpace(part[idx+1:])
-			} else if idx := strings.Index(part, ":"); idx != -1 {
-				key = strings.TrimSpace(part[:idx])
-				val = strings.TrimSpace(part[idx+1:])
-			}
-			if key != "" && val != "" {
-				headers[key] = val
-			}
-		}
-	}
+	headers := ParseHeaders(rawHeaders)
 
 	return Config{
 		ServiceName: serviceName,
@@ -117,6 +160,11 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 	cfg := LoadConfigFromEnv()
 	res := buildResource(ctx, cfg)
 
+	// Register global error handler to surface OTel export failures to logs
+	otel.SetErrorHandler(otel.ErrorHandlerFunc(func(err error) {
+		log.Printf("[OpenTelemetry Error] %v", err)
+	}))
+
 	// Configure OTLP HTTP trace exporter options
 	opts := []otlptracehttp.Option{}
 	parsedURL, err := url.Parse(cfg.Endpoint)
@@ -125,14 +173,9 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 		if parsedURL.Scheme != "https" {
 			opts = append(opts, otlptracehttp.WithInsecure())
 		}
-		path := strings.TrimSuffix(parsedURL.Path, "/")
-		if strings.HasSuffix(path, "/v1/traces") {
-			opts = append(opts, otlptracehttp.WithURLPath(path))
-		} else if strings.HasSuffix(path, "/v1/metrics") {
-			opts = append(opts, otlptracehttp.WithURLPath(strings.TrimSuffix(path, "/v1/metrics")+"/v1/traces"))
-		} else if path != "" {
-			opts = append(opts, otlptracehttp.WithURLPath(path+"/v1/traces"))
-		}
+		isGrafana := strings.Contains(parsedURL.Host, "grafana.net")
+		path := NormalizeOTLPPath(parsedURL.Path, "/v1/traces", isGrafana)
+		opts = append(opts, otlptracehttp.WithURLPath(path))
 	} else {
 		host := strings.TrimPrefix(strings.TrimPrefix(cfg.Endpoint, "http://"), "https://")
 		opts = append(opts, otlptracehttp.WithEndpoint(host), otlptracehttp.WithInsecure())
@@ -159,11 +202,20 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 		propagation.Baggage{},
 	))
 
-	log.Printf("[OpenTelemetry] Tracing initialized: service.name=%s, deployment.environment=%s, service.version=%s, endpoint=%s",
-		cfg.ServiceName, cfg.Environment, cfg.Version, cfg.Endpoint)
+	authPreview := "none"
+	if auth, ok := cfg.Headers["Authorization"]; ok {
+		if len(auth) > 16 {
+			authPreview = auth[:10] + "..." + auth[len(auth)-4:]
+		} else {
+			authPreview = "configured"
+		}
+	}
+	log.Printf("[OpenTelemetry] Tracing initialized: service.name=%s, deployment.environment=%s, service.version=%s, endpoint=%s, auth=%s",
+		cfg.ServiceName, cfg.Environment, cfg.Version, cfg.Endpoint, authPreview)
 
 	// Emit an immediate startup heartbeat span and flush so APM test connection checks succeed instantly
 	go func() {
+		time.Sleep(1 * time.Second)
 		tr := tp.Tracer("choresync-system")
 		_, span := tr.Start(context.Background(), "server.boot")
 		span.SetAttributes(
@@ -173,7 +225,14 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 			attribute.String("service.version", cfg.Version),
 		)
 		span.End()
-		_ = tp.ForceFlush(context.Background())
+
+		flushCtx, flushCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer flushCancel()
+		if err := tp.ForceFlush(flushCtx); err != nil {
+			log.Printf("[OpenTelemetry Error] Boot trace ForceFlush failed to %s: %v", cfg.Endpoint, err)
+		} else {
+			log.Printf("[OpenTelemetry] Boot trace successfully flushed to %s (service: %s, env: %s)", cfg.Endpoint, cfg.ServiceName, cfg.Environment)
+		}
 	}()
 
 	return tp.Shutdown, nil
@@ -199,14 +258,9 @@ func InitMeter(ctx context.Context) (func(context.Context) error, error) {
 		if parsedURL.Scheme != "https" {
 			opts = append(opts, otlpmetrichttp.WithInsecure())
 		}
-		path := strings.TrimSuffix(parsedURL.Path, "/")
-		if strings.HasSuffix(path, "/v1/metrics") {
-			opts = append(opts, otlpmetrichttp.WithURLPath(path))
-		} else if strings.HasSuffix(path, "/v1/traces") {
-			opts = append(opts, otlpmetrichttp.WithURLPath(strings.TrimSuffix(path, "/v1/traces")+"/v1/metrics"))
-		} else if path != "" {
-			opts = append(opts, otlpmetrichttp.WithURLPath(path+"/v1/metrics"))
-		}
+		isGrafana := strings.Contains(parsedURL.Host, "grafana.net")
+		path := NormalizeOTLPPath(parsedURL.Path, "/v1/metrics", isGrafana)
+		opts = append(opts, otlpmetrichttp.WithURLPath(path))
 	} else {
 		host := strings.TrimPrefix(strings.TrimPrefix(cfg.Endpoint, "http://"), "https://")
 		opts = append(opts, otlpmetrichttp.WithEndpoint(host), otlpmetrichttp.WithInsecure())
@@ -279,6 +333,14 @@ func InitMeter(ctx context.Context) (func(context.Context) error, error) {
 	)
 	if meterErr != nil {
 		log.Printf("[OpenTelemetry] Warning: failed to create chores_completed_total counter: %v", meterErr)
+	}
+
+	if httpRequestsCounter != nil {
+		httpRequestsCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("http.method", "BOOT"),
+			attribute.String("http.route", "/server.boot"),
+			attribute.Int("http.status_code", 200),
+		))
 	}
 
 	log.Printf("[OpenTelemetry] Metrics initialized: service.name=%s, deployment.environment=%s, service.version=%s, interval=3s",

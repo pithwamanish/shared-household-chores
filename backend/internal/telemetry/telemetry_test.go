@@ -156,3 +156,124 @@ func TestPGXQueryTracer(t *testing.T) {
 		t.Fatalf("expected non-nil PGXQueryTracer")
 	}
 }
+
+func TestParseHeaders(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected map[string]string
+	}{
+		{
+			name:     "colon separator with base64 padding",
+			input:    "Authorization: Basic MTAyNzU1MDpnbGMteHl6MTIz==",
+			expected: map[string]string{"Authorization": "Basic MTAyNzU1MDpnbGMteHl6MTIz=="},
+		},
+		{
+			name:     "equals separator with base64 padding",
+			input:    "Authorization=Basic MTAyNzU1MDpnbGMteHl6MTIz==",
+			expected: map[string]string{"Authorization": "Basic MTAyNzU1MDpnbGMteHl6MTIz=="},
+		},
+		{
+			name:     "bare basic auth token without header key",
+			input:    "Basic MTAyNzU1MDpnbGMteHl6MTIz==",
+			expected: map[string]string{"Authorization": "Basic MTAyNzU1MDpnbGMteHl6MTIz=="},
+		},
+		{
+			name:     "bare bearer token without header key",
+			input:    "Bearer eyJhbGciOiJIUzI1NiJ9.test==",
+			expected: map[string]string{"Authorization": "Bearer eyJhbGciOiJIUzI1NiJ9.test=="},
+		},
+		{
+			name:     "wrapped in outer quotes",
+			input:    `"Authorization=Basic dGVzdA=="`,
+			expected: map[string]string{"Authorization": "Basic dGVzdA=="},
+		},
+		{
+			name:     "multiple comma separated headers",
+			input:    "Authorization: Basic dGVzdA==, X-Custom-Header: custom-val",
+			expected: map[string]string{"Authorization": "Basic dGVzdA==", "X-Custom-Header": "custom-val"},
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: map[string]string{},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := telemetry.ParseHeaders(tc.input)
+			if len(got) != len(tc.expected) {
+				t.Fatalf("expected %d headers, got %d: %v", len(tc.expected), len(got), got)
+			}
+			for k, v := range tc.expected {
+				if got[k] != v {
+					t.Errorf("header %s: expected %q, got %q", k, v, got[k])
+				}
+			}
+		})
+	}
+}
+
+func TestNormalizeOTLPPath(t *testing.T) {
+	tests := []struct {
+		name           string
+		rawPath        string
+		defaultSubpath string
+		isGrafana      bool
+		expected       string
+	}{
+		{
+			name:           "Grafana bare domain",
+			rawPath:        "",
+			defaultSubpath: "/v1/traces",
+			isGrafana:      true,
+			expected:       "/otlp/v1/traces",
+		},
+		{
+			name:           "Grafana with /otlp",
+			rawPath:        "/otlp",
+			defaultSubpath: "/v1/traces",
+			isGrafana:      true,
+			expected:       "/otlp/v1/traces",
+		},
+		{
+			name:           "Grafana with /otlp/ and metrics",
+			rawPath:        "/otlp/",
+			defaultSubpath: "/v1/metrics",
+			isGrafana:      true,
+			expected:       "/otlp/v1/metrics",
+		},
+		{
+			name:           "Grafana already with /otlp/v1/traces requested for metrics",
+			rawPath:        "/otlp/v1/traces",
+			defaultSubpath: "/v1/metrics",
+			isGrafana:      true,
+			expected:       "/otlp/v1/metrics",
+		},
+		{
+			name:           "Local collector empty path",
+			rawPath:        "",
+			defaultSubpath: "/v1/traces",
+			isGrafana:      false,
+			expected:       "/v1/traces",
+		},
+		{
+			name:           "Local collector /v1/traces",
+			rawPath:        "/v1/traces",
+			defaultSubpath: "/v1/traces",
+			isGrafana:      false,
+			expected:       "/v1/traces",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := telemetry.NormalizeOTLPPath(tc.rawPath, tc.defaultSubpath, tc.isGrafana)
+			if got != tc.expected {
+				t.Errorf("expected %q, got %q", tc.expected, got)
+			}
+		})
+	}
+}
+

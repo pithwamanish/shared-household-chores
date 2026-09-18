@@ -16,7 +16,7 @@
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
-  "graphTooltip": 0,
+  "graphTooltip": 1,
   "id": null,
   "links": [],
   "liveNow": false,
@@ -24,7 +24,7 @@
     {
       "collapsed": false,
       "gridPos": {
-        "h": 4,
+        "h": 1,
         "w": 24,
         "x": 0,
         "y": 0
@@ -78,9 +78,9 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": 6,
         "x": 0,
-        "y": 4
+        "y": 1
       },
       "id": 2,
       "options": {
@@ -97,7 +97,6 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -105,7 +104,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "up",
+          "expr": "up or vector(1)",
           "instant": true,
           "legendFormat": "{{job}}",
           "range": false,
@@ -136,17 +135,9 @@
             "drawStyle": "line",
             "fillOpacity": 15,
             "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
             "lineInterpolation": "linear",
             "lineWidth": 2,
             "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
             "showPoints": "auto",
             "spanNulls": false,
             "stacking": {
@@ -162,9 +153,9 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 16,
-        "x": 8,
-        "y": 4
+        "w": 10,
+        "x": 6,
+        "y": 1
       },
       "id": 3,
       "options": {
@@ -186,26 +177,99 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "rate(otelcol_receiver_accepted_spans[1m]) or rate(otelcol_exporter_sent_spans[1m])",
+          "expr": "rate(otelcol_receiver_accepted_spans[1m]) or rate(otelcol_exporter_sent_spans[1m]) or vector(0)",
           "legendFormat": "Spans ({{job}})",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "OTel Collector Span Ingestion Rate",
+      "title": "OTel Collector Span Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Total HTTP requests processed by backend",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "req/sec",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "gradientMode": "none",
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "lastNotNull"],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum(rate(http_requests_total{deployment_environment=~\"$environment\", service_version=~\"$version\"}[1m])) by (http_route) or sum(rate(http_requests_total[1m])) by (http_route)",
+          "legendFormat": "{{http_route}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Application Request Rate",
       "type": "timeseries"
     },
     {
       "collapsed": false,
       "gridPos": {
-        "h": 4,
+        "h": 1,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 7
       },
-      "id": 4,
+      "id": 5,
       "panels": [],
-      "title": "Logs & Traces Exploration",
+      "title": "Logs & Application Signals",
       "type": "row"
     },
     {
@@ -217,9 +281,9 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 8
       },
-      "id": 5,
+      "id": 6,
       "options": {
         "dedupStrategy": "none",
         "enableLogDetails": true,
@@ -255,7 +319,52 @@
     "tempo"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "definition": "label_values(http_requests_total, deployment_environment)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "environment",
+        "options": [],
+        "query": {
+          "query": "label_values(http_requests_total, deployment_environment)",
+          "refId": "Prometheus-environment-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "definition": "label_values(http_requests_total, service_version)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "version",
+        "options": [],
+        "query": {
+          "query": "label_values(http_requests_total, service_version)",
+          "refId": "Prometheus-version-Variable-Query"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-15m",
@@ -265,6 +374,6 @@
   "timezone": "browser",
   "title": "Observability Overview",
   "uid": "observability-overview",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
