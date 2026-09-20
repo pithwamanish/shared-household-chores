@@ -52,3 +52,39 @@ groups:
           description: "Database queries are failing on {{ $labels.service }} in {{ $labels.environment }} at rate {{ $value | printf \"%.2f\" }} errors/sec."
           dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
           runbook_url: "on-call-engineer/runbook.md#database-query-errors"
+
+      - alert: ServiceTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "Target instance is down on {{ $labels.instance }}"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} is unreachable."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "on-call-engineer/runbook.md#service-target-down"
+
+      - alert: HighChoreRejectionRate
+        expr: |
+          (
+            sum(rate({__name__=~"(choresync_)?chore_approvals_total", approval_decision="rejected"}[5m]))
+            /
+            clamp_min(sum(rate({__name__=~"(choresync_)?chore_approvals_total"}[5m])), 0.001)
+          ) * 100 > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: product-team
+        annotations:
+          summary: "Elevated chore rejection rate on {{ $labels.service }}"
+          description: "Over 50% of chore approvals are being rejected in {{ $labels.environment }}."
+          dashboard_url: "http://localhost:3001/d/choresync-fullstack-apm"
+          runbook_url: "on-call-engineer/runbook.md#chore-rejections"
+

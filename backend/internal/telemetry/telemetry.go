@@ -239,11 +239,17 @@ func InitTracer(ctx context.Context) (func(context.Context) error, error) {
 }
 
 var (
-	httpRequestsCounter    metric.Int64Counter
-	httpDurationHistogram  metric.Float64Histogram
-	dbErrorsCounter        metric.Int64Counter
-	dbDurationHistogram    metric.Float64Histogram
-	choresCompletedCounter metric.Int64Counter
+	httpRequestsCounter      metric.Int64Counter
+	httpDurationHistogram    metric.Float64Histogram
+	dbErrorsCounter          metric.Int64Counter
+	dbDurationHistogram      metric.Float64Histogram
+	choresCreatedCounter     metric.Int64Counter
+	choresCompletedCounter   metric.Int64Counter
+	choreApprovalsCounter    metric.Int64Counter
+	choreSwapsCounter        metric.Int64Counter
+	rewardsRedeemedCounter   metric.Int64Counter
+	pointsTransactedCounter  metric.Int64Counter
+	householdsCreatedCounter metric.Int64Counter
 )
 
 // InitMeter initializes OpenTelemetry MeterProvider, instruments, and periodic metric exporter.
@@ -326,6 +332,15 @@ func InitMeter(ctx context.Context) (func(context.Context) error, error) {
 		log.Printf("[OpenTelemetry] Warning: failed to create db_query_errors_total counter: %v", meterErr)
 	}
 
+	choresCreatedCounter, meterErr = meter.Int64Counter(
+		"chores_created_total",
+		metric.WithDescription("Total count of chores created"),
+		metric.WithUnit("{chore}"),
+	)
+	if meterErr != nil {
+		log.Printf("[OpenTelemetry] Warning: failed to create chores_created_total counter: %v", meterErr)
+	}
+
 	choresCompletedCounter, meterErr = meter.Int64Counter(
 		"chores_completed_total",
 		metric.WithDescription("Total count of completed chores"),
@@ -333,6 +348,51 @@ func InitMeter(ctx context.Context) (func(context.Context) error, error) {
 	)
 	if meterErr != nil {
 		log.Printf("[OpenTelemetry] Warning: failed to create chores_completed_total counter: %v", meterErr)
+	}
+
+	choreApprovalsCounter, meterErr = meter.Int64Counter(
+		"chore_approvals_total",
+		metric.WithDescription("Total count of chore approval decisions"),
+		metric.WithUnit("{decision}"),
+	)
+	if meterErr != nil {
+		log.Printf("[OpenTelemetry] Warning: failed to create chore_approvals_total counter: %v", meterErr)
+	}
+
+	choreSwapsCounter, meterErr = meter.Int64Counter(
+		"chore_swaps_total",
+		metric.WithDescription("Total count of chore swap lifecycle events"),
+		metric.WithUnit("{swap}"),
+	)
+	if meterErr != nil {
+		log.Printf("[OpenTelemetry] Warning: failed to create chore_swaps_total counter: %v", meterErr)
+	}
+
+	rewardsRedeemedCounter, meterErr = meter.Int64Counter(
+		"rewards_redeemed_total",
+		metric.WithDescription("Total count of rewards redeemed"),
+		metric.WithUnit("{redemption}"),
+	)
+	if meterErr != nil {
+		log.Printf("[OpenTelemetry] Warning: failed to create rewards_redeemed_total counter: %v", meterErr)
+	}
+
+	pointsTransactedCounter, meterErr = meter.Int64Counter(
+		"points_transacted_total",
+		metric.WithDescription("Total count of gamification points earned or spent"),
+		metric.WithUnit("{point}"),
+	)
+	if meterErr != nil {
+		log.Printf("[OpenTelemetry] Warning: failed to create points_transacted_total counter: %v", meterErr)
+	}
+
+	householdsCreatedCounter, meterErr = meter.Int64Counter(
+		"households_created_total",
+		metric.WithDescription("Total count of households established"),
+		metric.WithUnit("{household}"),
+	)
+	if meterErr != nil {
+		log.Printf("[OpenTelemetry] Warning: failed to create households_created_total counter: %v", meterErr)
 	}
 
 	if httpRequestsCounter != nil {
@@ -378,11 +438,73 @@ func RecordDBQuery(ctx context.Context, operation string, duration float64, err 
 	}
 }
 
-// RecordChoreCompleted records the completion of a chore for product telemetry.
-func RecordChoreCompleted(ctx context.Context, householdID string) {
+// RecordChoreCreated records the creation of a new chore.
+func RecordChoreCreated(ctx context.Context, category, mode string) {
+	if choresCreatedCounter != nil {
+		choresCreatedCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("chore.category", category),
+			attribute.String("household.mode", mode),
+		))
+	}
+}
+
+// RecordChoreCompleted records the completion of a chore with its category and point award.
+func RecordChoreCompleted(ctx context.Context, category string, requiresApproval bool, pointsAwarded int) {
 	if choresCompletedCounter != nil {
 		choresCompletedCounter.Add(ctx, 1, metric.WithAttributes(
-			attribute.String("household.id", householdID),
+			attribute.String("chore.category", category),
+			attribute.Bool("chore.requires_approval", requiresApproval),
+		))
+	}
+	if pointsAwarded > 0 && pointsTransactedCounter != nil {
+		pointsTransactedCounter.Add(ctx, int64(pointsAwarded), metric.WithAttributes(
+			attribute.String("points.type", "earned"),
+		))
+	}
+}
+
+// RecordChoreApproval records an admin approval decision on a completed chore.
+func RecordChoreApproval(ctx context.Context, decision string, pointsAwarded int) {
+	if choreApprovalsCounter != nil {
+		choreApprovalsCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("approval.decision", decision),
+		))
+	}
+	if decision == "approved" && pointsAwarded > 0 && pointsTransactedCounter != nil {
+		pointsTransactedCounter.Add(ctx, int64(pointsAwarded), metric.WithAttributes(
+			attribute.String("points.type", "earned"),
+		))
+	}
+}
+
+// RecordChoreSwap records a swap proposal, acceptance, rejection, or cancellation.
+func RecordChoreSwap(ctx context.Context, status string) {
+	if choreSwapsCounter != nil {
+		choreSwapsCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("swap.status", status),
+		))
+	}
+}
+
+// RecordRewardRedeemed records when a household member claims a reward.
+func RecordRewardRedeemed(ctx context.Context, mode string, pointsCost int) {
+	if rewardsRedeemedCounter != nil {
+		rewardsRedeemedCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("household.mode", mode),
+		))
+	}
+	if pointsCost > 0 && pointsTransactedCounter != nil {
+		pointsTransactedCounter.Add(ctx, int64(pointsCost), metric.WithAttributes(
+			attribute.String("points.type", "spent"),
+		))
+	}
+}
+
+// RecordHouseholdCreated records creation of flatmate, family, or couple living arrangements.
+func RecordHouseholdCreated(ctx context.Context, mode string) {
+	if householdsCreatedCounter != nil {
+		householdsCreatedCounter.Add(ctx, 1, metric.WithAttributes(
+			attribute.String("household.mode", mode),
 		))
 	}
 }

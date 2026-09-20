@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/choresync/backend/internal/models"
 	"github.com/choresync/backend/internal/store"
+	"github.com/choresync/backend/internal/telemetry"
 )
 
 type ChoreHandler struct {
@@ -67,6 +70,17 @@ func (h *ChoreHandler) CreateChore(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleStoreError(w, err, fmt.Sprintf("Household with ID '%s' not found", householdID))
 		return
+	}
+
+	telemetry.RecordChoreCreated(r.Context(), chore.Category, "standard")
+	telemetry.Info(r.Context(), "Chore created", "chore_id", chore.ID, "category", chore.Category, "points", chore.EffortPoints)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("chore.id", chore.ID),
+			attribute.String("chore.category", chore.Category),
+			attribute.Int("chore.points", chore.EffortPoints),
+		)
 	}
 
 	respondJSON(w, http.StatusCreated, chore)
@@ -160,6 +174,18 @@ func (h *ChoreHandler) CompleteChore(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleStoreError(w, err, fmt.Sprintf("Chore with ID '%s' or Member not found", choreID))
 		return
+	}
+
+	telemetry.RecordChoreCompleted(r.Context(), chore.Category, chore.RequiresApproval, pointsAwarded)
+	telemetry.Info(r.Context(), "Chore completed", "chore_id", chore.ID, "member_id", req.MemberID, "points", pointsAwarded, "requires_approval", chore.RequiresApproval)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("chore.id", chore.ID),
+			attribute.String("chore.category", chore.Category),
+			attribute.Int("chore.points_awarded", pointsAwarded),
+			attribute.Bool("chore.requires_approval", chore.RequiresApproval),
+		)
 	}
 
 	resp := models.ChoreCompleteResponse{

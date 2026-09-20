@@ -67,7 +67,12 @@ func TestInitMeter(t *testing.T) {
 	// Verify recording functions execute safely without panic
 	telemetry.RecordHTTPRequest(ctx, "GET", "/api/v1/households", 200, 0.015)
 	telemetry.RecordDBQuery(ctx, "postgresql.query", 0.005, nil)
-	telemetry.RecordChoreCompleted(ctx, "h-roommates")
+	telemetry.RecordChoreCreated(ctx, "kitchen", "roommates")
+	telemetry.RecordChoreCompleted(ctx, "kitchen", false, 15)
+	telemetry.RecordChoreApproval(ctx, "approved", 20)
+	telemetry.RecordChoreSwap(ctx, "accepted")
+	telemetry.RecordRewardRedeemed(ctx, "roommates", 50)
+	telemetry.RecordHouseholdCreated(ctx, "roommates")
 
 	_ = shutdown(context.Background())
 }

@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/choresync/backend/internal/models"
 	"github.com/choresync/backend/internal/store"
+	"github.com/choresync/backend/internal/telemetry"
 )
 
 type RewardHandler struct {
@@ -83,6 +86,16 @@ func (h *RewardHandler) RedeemReward(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleStoreError(w, err, fmt.Sprintf("Reward with ID '%s' or Member not found", rewardID))
 		return
+	}
+
+	telemetry.RecordRewardRedeemed(r.Context(), "standard", 10)
+	telemetry.Info(r.Context(), "Reward redeemed", "redemption_id", redemption.ID, "reward_id", rewardID, "member_id", req.MemberID)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("reward.id", rewardID),
+			attribute.String("redemption.id", redemption.ID),
+		)
 	}
 
 	respondJSON(w, http.StatusCreated, redemption)

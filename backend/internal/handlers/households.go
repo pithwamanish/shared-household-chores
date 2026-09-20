@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/choresync/backend/internal/models"
 	"github.com/choresync/backend/internal/store"
+	"github.com/choresync/backend/internal/telemetry"
 )
 
 type HouseholdHandler struct {
@@ -40,6 +43,17 @@ func (h *HouseholdHandler) CreateHousehold(w http.ResponseWriter, r *http.Reques
 	}
 
 	household := h.Store.CreateHousehold(req)
+
+	telemetry.RecordHouseholdCreated(r.Context(), string(household.Settings.DefaultMode))
+	telemetry.Info(r.Context(), "Household created", "household_id", household.ID, "mode", household.Settings.DefaultMode)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("household.id", household.ID),
+			attribute.String("household.mode", string(household.Settings.DefaultMode)),
+		)
+	}
+
 	respondJSON(w, http.StatusCreated, household)
 }
 

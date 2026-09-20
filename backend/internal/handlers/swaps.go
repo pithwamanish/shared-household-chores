@@ -7,9 +7,12 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/choresync/backend/internal/models"
 	"github.com/choresync/backend/internal/store"
+	"github.com/choresync/backend/internal/telemetry"
 )
 
 type SwapHandler struct {
@@ -86,6 +89,17 @@ func (h *SwapHandler) CreateSwap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	telemetry.RecordChoreSwap(r.Context(), "proposed")
+	telemetry.Info(r.Context(), "Chore swap proposed", "swap_id", swap.ID, "chore_id", req.ChoreID, "requester_id", req.RequesterID)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("swap.id", swap.ID),
+			attribute.String("chore.id", req.ChoreID),
+			attribute.String("swap.status", "proposed"),
+		)
+	}
+
 	respondJSON(w, http.StatusCreated, swap)
 }
 
@@ -110,6 +124,16 @@ func (h *SwapHandler) AcceptSwap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	telemetry.RecordChoreSwap(r.Context(), "accepted")
+	telemetry.Info(r.Context(), "Chore swap accepted", "swap_id", swapID, "acceptor_id", req.AcceptorMemberID)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("swap.id", swapID),
+			attribute.String("swap.status", "accepted"),
+		)
+	}
+
 	respondJSON(w, http.StatusOK, models.SuccessResponse{
 		Success: true,
 		Message: "Swap accepted and chore reassigned",
@@ -125,6 +149,16 @@ func (h *SwapHandler) RejectSwap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	telemetry.RecordChoreSwap(r.Context(), "rejected")
+	telemetry.Info(r.Context(), "Chore swap rejected", "swap_id", swapID)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("swap.id", swapID),
+			attribute.String("swap.status", "rejected"),
+		)
+	}
+
 	respondJSON(w, http.StatusOK, models.SuccessResponse{
 		Success: true,
 		Message: "Swap rejected successfully",
@@ -138,6 +172,16 @@ func (h *SwapHandler) CancelSwap(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		handleStoreError(w, err, fmt.Sprintf("Swap with ID '%s' not found", swapID))
 		return
+	}
+
+	telemetry.RecordChoreSwap(r.Context(), "cancelled")
+	telemetry.Info(r.Context(), "Chore swap cancelled", "swap_id", swapID)
+	span := trace.SpanFromContext(r.Context())
+	if span != nil {
+		span.SetAttributes(
+			attribute.String("swap.id", swapID),
+			attribute.String("swap.status", "cancelled"),
+		)
 	}
 
 	respondJSON(w, http.StatusOK, models.SuccessResponse{
