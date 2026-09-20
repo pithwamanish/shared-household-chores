@@ -4,9 +4,9 @@ groups:
       - alert: HighHttpErrorRate
         expr: |
           (
-            sum(rate(choresync_http_requests_total{http_status_code=~"5.."}[1m]))
+            sum(rate({__name__=~"(choresync_)?http_requests_total", http_status_code=~"5.."}[1m]))
             /
-            clamp_min(sum(rate(choresync_http_requests_total[1m])), 0.001)
+            clamp_min(sum(rate({__name__=~"(choresync_)?http_requests_total"}[1m])), 0.001)
           ) * 100 > 5
         for: 30s
         labels:
@@ -23,7 +23,7 @@ groups:
 
       - alert: HighRequestLatency
         expr: |
-          histogram_quantile(0.95, sum(rate(choresync_http_server_request_duration_seconds_bucket[1m])) by (le)) > 1.0
+          histogram_quantile(0.95, sum(rate({__name__=~"(choresync_)?http_server_request_duration_seconds_bucket"}[1m])) by (le)) > 1.0
         for: 1m
         labels:
           severity: warning
@@ -39,7 +39,7 @@ groups:
 
       - alert: DatabaseQueryErrors
         expr: |
-          sum(rate(choresync_db_query_errors_total[1m])) > 0.05
+          sum(rate({__name__=~"(choresync_)?db_query_errors_total"}[1m])) > 0.05
         for: 30s
         labels:
           severity: critical
