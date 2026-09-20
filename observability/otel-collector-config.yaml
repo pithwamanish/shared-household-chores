@@ -37,7 +37,6 @@ exporters:
   # Metrics -> Prometheus Scrape Endpoint
   prometheus:
     endpoint: "0.0.0.0:8889"
-    namespace: "choresync"
     resource_to_telemetry_conversion:
       enabled: true
 
