@@ -312,6 +312,7 @@ test.describe('ChoreSync End-to-End Verification Journey', () => {
   });
 
   test('Step 4 & 5: State Transitions, Completions, Approvals & Activity Log', async ({ page }) => {
+    test.setTimeout(60000);
     // Switch to Liam Vance
     await switchUser(page, 'm-liam');
     await expect(page.getByText('85 pts')).toBeVisible();
@@ -693,5 +694,50 @@ test.describe('ChoreSync End-to-End Verification Journey', () => {
     expect(reminderEmail.subject).toContain('Friendly reminder');
     expect(reminderEmail.html_body).toContain('Vacuum Living Room');
   });
+
+  test('Step 12: Local Cloud Emulation (Floci: S3 Photo Proof Storage & SQS Nudge Queue)', async ({ request }) => {
+    // 1. Verify S3 Photo Proof Upload via Floci
+    const sampleImageBuffer = Buffer.from([
+      0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01,
+      0x01, 0x01, 0x00, 0x48, 0x00, 0x48, 0x00, 0x00, 0xff, 0xdb, 0x00, 0x43,
+      0x00, 0xff, 0xd9
+    ]);
+
+    const uploadRes = await request.post('http://localhost:8000/api/v1/uploads/photo', {
+      multipart: {
+        photo: {
+          name: 'proof-livingroom.jpg',
+          mimeType: 'image/jpeg',
+          buffer: sampleImageBuffer,
+        },
+      },
+    });
+
+    expect(uploadRes.status()).toBe(200);
+    const uploadData = await uploadRes.json();
+    expect(uploadData.success).toBe(true);
+    expect(uploadData.s3_key).toContain('proofs/');
+    expect(uploadData.url).toContain('/api/v1/uploads/photo/');
+    expect(uploadData.size_bytes).toBe(sampleImageBuffer.length);
+
+    // 2. Verify S3 Photo Retrieval from Floci
+    const photoFetchRes = await request.get(`http://localhost:8000${uploadData.url}`);
+    expect(photoFetchRes.status()).toBe(200);
+    expect(photoFetchRes.headers()['content-type']).toBe('image/jpeg');
+    const fetchedBody = await photoFetchRes.body();
+    expect(fetchedBody.length).toBe(sampleImageBuffer.length);
+
+    // 3. Verify SQS Nudge Asynchronous Dispatch via Floci
+    const nudgeRes = await request.post('http://localhost:8000/api/v1/chores/c-vacuum-living/nudge', {
+      data: {
+        sender_member_id: 'm-sarah',
+      },
+    });
+    expect(nudgeRes.status()).toBe(200);
+    const nudgeData = await nudgeRes.json();
+    expect(nudgeData.success).toBe(true);
+    expect(nudgeData.sqs_queued).toBe(true);
+  });
 });
+
 

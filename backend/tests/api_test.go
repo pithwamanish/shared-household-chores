@@ -16,7 +16,7 @@ import (
 func setupTestRouter() (http.Handler, store.Store) {
 	appStore := store.NewStore()
 	emailSvc := email.NewMockService(email.Config{})
-	handler := server.NewRouter(appStore, emailSvc)
+	handler := server.NewRouter(appStore, emailSvc, nil, nil)
 	return handler, appStore
 }
 

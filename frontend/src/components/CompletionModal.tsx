@@ -11,6 +11,7 @@ import {
   Coins,
   Sparkles,
 } from 'lucide-react';
+import { api } from '../services/api';
 
 interface CompletionModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
   const [proofNotes, setProofNotes] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   if (!isOpen || !chore) return null;
 
@@ -69,14 +71,25 @@ export const CompletionModal: React.FC<CompletionModalProps> = ({
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      setIsUploading(true);
+      try {
+        const uploadRes = await api.uploadPhoto(file);
+        if (uploadRes?.url) {
+          setPhotoUrl(uploadRes.url);
+        }
+      } catch (err) {
+        console.warn('Cloud upload fallback to local preview', err);
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setPhotoUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } finally {
+        setIsUploading(false);
+      }
     }
   };
 

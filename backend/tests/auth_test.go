@@ -15,7 +15,7 @@ import (
 
 func newTestRouter(s store.Store) (http.Handler, email.Service) {
 	em := email.NewMockService(email.Config{})
-	return server.NewRouter(s, em), em
+	return server.NewRouter(s, em, nil, nil), em
 }
 
 func TestAuthDemoLoginAndJWTIssuance(t *testing.T) {

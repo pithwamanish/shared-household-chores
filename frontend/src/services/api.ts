@@ -1059,6 +1059,20 @@ export const localApi = {
     }
   },
 
+  async uploadPhoto(file: File): Promise<{ success: boolean; url: string; s3_key: string }> {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve({
+          success: true,
+          url: reader.result as string,
+          s3_key: `proofs/local-${Date.now()}-${file.name}`,
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  },
+
   async rotateChore(choreId: string): Promise<Chore> {
     const store = loadStore();
     const chore = store.chores.find((c) => c.id === choreId);
@@ -1782,6 +1796,17 @@ export const api = {
           }
         ),
       () => localApi.completeChore(choreId, memberId, proofPayload)
+    );
+  },
+
+  // Cloud Object Storage (S3 / Floci) - Photo proof upload
+  async uploadPhoto(file: File): Promise<{ success: boolean; url: string; s3_key: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return withFallback(
+      'uploadPhoto',
+      () => httpClient.post<{ success: boolean; url: string; s3_key: string }>('/uploads/photo', formData),
+      () => localApi.uploadPhoto(file)
     );
   },
 

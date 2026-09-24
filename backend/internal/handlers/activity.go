@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/choresync/backend/internal/cloud"
 	"github.com/choresync/backend/internal/email"
 	"github.com/choresync/backend/internal/models"
 	"github.com/choresync/backend/internal/store"
@@ -17,10 +18,11 @@ import (
 type ActivityHandler struct {
 	Store store.Store
 	Email email.Service
+	Queue cloud.QueueService
 }
 
-func NewActivityHandler(s store.Store, em email.Service) *ActivityHandler {
-	return &ActivityHandler{Store: s, Email: em}
+func NewActivityHandler(s store.Store, em email.Service, q cloud.QueueService) *ActivityHandler {
+	return &ActivityHandler{Store: s, Email: em, Queue: q}
 }
 
 // GetActivities retrieves audit logs for a household with optional query filtering and pagination.
@@ -75,27 +77,49 @@ func (h *ActivityHandler) SendNudge(w http.ResponseWriter, r *http.Request) {
 	}
 
 	emailDispatched := false
-	if h.Email != nil {
-		chore, err := h.Store.GetChore(choreID)
-		if err == nil && chore.CurrentAssigneeID != nil {
-			assignee, err := h.Store.GetMember(*chore.CurrentAssigneeID)
-			sender, _ := h.Store.GetMember(req.SenderMemberID)
-			household, _ := h.Store.GetHousehold(chore.HouseholdID)
+	sqsQueued := false
 
-			senderName := "A roommate"
-			if sender != nil {
-				senderName = sender.Name
-			}
-			hhName := "our household"
-			if household != nil {
-				hhName = household.Name
+	chore, err := h.Store.GetChore(choreID)
+	if err == nil && chore.CurrentAssigneeID != nil {
+		assignee, err := h.Store.GetMember(*chore.CurrentAssigneeID)
+		sender, _ := h.Store.GetMember(req.SenderMemberID)
+		household, _ := h.Store.GetHousehold(chore.HouseholdID)
+
+		senderName := "A roommate"
+		if sender != nil {
+			senderName = sender.Name
+		}
+		hhName := "our household"
+		if household != nil {
+			hhName = household.Name
+		}
+
+		if err == nil && assignee != nil && assignee.Email != nil && *assignee.Email != "" {
+			dueStr := "today"
+			if chore.DueDate != nil {
+				dueStr = *chore.DueDate
 			}
 
-			if err == nil && assignee != nil && assignee.Email != nil && *assignee.Email != "" {
-				dueStr := "today"
-				if chore.DueDate != nil {
-					dueStr = *chore.DueDate
+			// If cloud SQS queue is enabled, enqueue asynchronous reminder job
+			if h.Queue != nil && h.Queue.IsEnabled() {
+				job := cloud.ReminderJob{
+					ChoreID:       chore.ID,
+					ChoreTitle:    chore.Title,
+					DueDate:       dueStr,
+					AssigneeEmail: *assignee.Email,
+					AssigneeName:  assignee.Name,
+					SenderName:    senderName,
+					HouseholdName: hhName,
 				}
+				_, qErr := h.Queue.PublishReminder(r.Context(), job)
+				if qErr == nil {
+					sqsQueued = true
+					emailDispatched = true
+				}
+			}
+
+			// Fallback: synchronous dispatch if SQS was not used
+			if !sqsQueued && h.Email != nil {
 				_ = h.Email.SendChoreReminder(*assignee.Email, assignee.Name, senderName, chore.Title, dueStr, hhName)
 				emailDispatched = true
 			}
@@ -106,6 +130,7 @@ func (h *ActivityHandler) SendNudge(w http.ResponseWriter, r *http.Request) {
 		Success:         true,
 		Message:         msg,
 		EmailDispatched: emailDispatched,
+		SQSQueued:       sqsQueued,
 	})
 }
 

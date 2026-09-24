@@ -377,6 +377,7 @@ type ChoreNudgeResponse struct {
 	Success         bool   `json:"success"`
 	Message         string `json:"message"`
 	EmailDispatched bool   `json:"email_dispatched,omitempty"`
+	SQSQueued       bool   `json:"sqs_queued,omitempty"`
 }
 
 // ChoreComment represents a comment on a chore.

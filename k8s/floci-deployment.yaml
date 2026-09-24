@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floci
+  labels:
+    app: floci
+    app.kubernetes.io/name: floci
+    app.kubernetes.io/part-of: choresync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: floci
+  template:
+    metadata:
+      labels:
+        app: floci
+        app.kubernetes.io/name: floci
+        app.kubernetes.io/part-of: choresync
+    spec:
+      containers:
+        - name: floci
+          image: floci/floci:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 4566
+              name: http
+          env:
+            - name: SERVICES
+              value: "s3,sqs"
+            - name: DEFAULT_REGION
+              value: "us-east-1"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 250m
+              memory: 128Mi
+          readinessProbe:
+            tcpSocket:
+              port: 4566
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            timeoutSeconds: 2
+          livenessProbe:
+            tcpSocket:
+              port: 4566
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2

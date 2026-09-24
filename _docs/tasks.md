@@ -20,6 +20,7 @@ This document tracks all implementation, testing, and infrastructure tasks for *
 | **TASK-010** | Cloud Deployment & Production Hardening (Render + Neon + Caddy) | SRE | `DONE` | `feat/task-010-cloud-deployment` | None |
 | **TASK-011** | Actionable Alerting & Autonomous Incident Response (Gates 11 & 12) | SRE | `DONE` | `feat/task-011-alerts-incident-response` | None |
 | **TASK-012** | Local Kubernetes Deployment with Kind (Gate 10) | SRE | `DONE` | `feat/task-012-k8s-kind` | None |
+| **TASK-013** | Local Cloud Emulator Integration (Floci: S3 + SQS) | SRE / SWE | `DONE` | `feat/task-013-cloud-emulator` | None |
 
 ---
 
@@ -509,6 +510,67 @@ Author declarative Kubernetes manifests in `k8s/`, configure PostgreSQL persiste
 - [x] `make k8s-verify` passes 100% with zero errors
 - [x] Offline image loading functions with zero external registry network roundtrips
 - [x] Zero drift with `contracts/openapi.yaml` and application domain entities
+
+---
+
+### TASK-013: Local Cloud Emulator Integration (Floci: S3 + SQS)
+
+## Objective
+Integrate Floci (`floci/floci:latest`) as an ultra-lightweight (<50MB RAM) local cloud emulator for AWS S3 and SQS. Implement S3 object storage for chore completion photo proof uploads and retrievals, and SQS queueing for asynchronous chore reminder nudges. Maintain zero code forking using AWS SDK for Go v2, and achieve full parity across Docker Compose, Kubernetes manifests, and Playwright E2E suites.
+
+## Context
+- Specifications & Guidelines: [`_docs/stack.md`](stack.md) (Section 7), `AGENTS.md` (Gate 6: Local Cloud First)
+- Contract: [`contracts/openapi.yaml`](../contracts/openapi.yaml) (`/api/uploads/photo`, `/api/uploads/photo/{key}`, `/api/v1/chores/{chore_id}/nudge`)
+- Local Cloud Emulator: Floci (`http://floci:4566` / `http://localhost:4566`)
+- Automated E2E Suite: [`e2e/tests/choresync.spec.ts`](../e2e/tests/choresync.spec.ts) (Step 12)
+
+## Scope & File Boundaries
+- **Assigned Role**: SRE / SWE
+- **Branch**: `feat/task-013-cloud-emulator`
+- **Files created or modified**:
+  - `backend/internal/cloud/cloud.go`
+  - `backend/internal/cloud/storage.go`
+  - `backend/internal/cloud/queue.go`
+  - `backend/internal/handlers/uploads.go`
+  - `backend/internal/handlers/activity.go`
+  - `backend/internal/server/router.go`
+  - `backend/cmd/server/main.go`
+  - `backend/tests/cloud_test.go`
+  - `contracts/openapi.yaml`
+  - `docker-compose.yml`
+  - `docker-compose.prod.yml`
+  - `docker-compose.deploy.yml`
+  - `k8s/floci-deployment.yaml`
+  - `k8s/floci-service.yaml`
+  - `k8s/app-deployment.yaml`
+  - `k8s/configmap.yaml`
+  - `k8s/kustomization.yaml`
+  - `frontend/src/services/api.ts`
+  - `frontend/src/components/CompletionModal.tsx`
+  - `e2e/tests/choresync.spec.ts`
+  - `_docs/stack.md`
+  - `_docs/tasks.md`
+  - `_docs/state.md`
+
+## Subtasks
+- [x] Integrate Floci container in `docker-compose.yml`, `docker-compose.prod.yml`, and `docker-compose.deploy.yml` with port 4566 and TCP socket healthchecks
+- [x] Configure AWS Go SDK v2 with `AWS_ENDPOINT_URL` support and auto-provisioning of `choresync-proofs` bucket and `choresync-reminders` queue
+- [x] Implement S3 storage service and multipart `POST /api/v1/uploads/photo` & `GET /api/v1/uploads/photo/{key}` streaming endpoints
+- [x] Update `SendNudge` activity handler to enqueue asynchronous reminder jobs to SQS queue with synchronous fallback
+- [x] Implement long-polling SQS background worker in Go backend to consume reminder messages
+- [x] Author declarative Kubernetes manifests in `k8s/floci-deployment.yaml` and `k8s/floci-service.yaml` with configmap integration
+- [x] Update frontend `api.uploadPhoto` and `CompletionModal` for live cloud proof uploads
+- [x] Add Go unit test suite in `backend/tests/cloud_test.go` covering S3 and SQS interactions (100% passing)
+- [x] Add Step 12 to Playwright E2E verification journey validating live S3 upload/retrieval and SQS nudge queueing (100% passing)
+
+## Acceptance Criteria
+- [x] Floci starts cleanly in sub-second time with <50MB RAM footprint
+- [x] S3 photo proof upload stores image in `choresync-proofs` bucket and returns accessible stream URL
+- [x] SQS reminder queue receives nudge message with `"sqs_queued": true` and background worker consumes it
+- [x] Full Go backend unit tests pass 100%
+- [x] Full Playwright E2E suite (12/12 journeys) passes 100%
+- [x] Zero code forking: standard AWS SDK Go v2 used with environment variable configuration
+
 
 
 

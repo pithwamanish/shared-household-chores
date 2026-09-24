@@ -697,6 +697,59 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequestError'
         '404':
+  /api/uploads/photo:
+    post:
+      tags: [Chores]
+      summary: Upload chore completion photo proof
+      description: Uploads an image file to cloud object storage (S3 / Floci emulator) and returns the asset URLs.
+      operationId: uploadProofPhoto
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Image file (jpeg, png, webp, gif) up to 10MB
+      responses:
+        '200':
+          description: Photo uploaded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadProofPhotoResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '415':
+          description: Unsupported media type
+
+  /api/uploads/photo/{key}:
+    get:
+      tags: [Chores]
+      summary: Retrieve photo proof from storage
+      description: Streams the image binary from S3 / Floci cloud object storage.
+      operationId: getProofPhoto
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: The S3 object key or filename
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Image binary stream
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '404':
           $ref: '#/components/responses/NotFoundError'
 
   /api/households/{household_id}/approvals:
@@ -2120,6 +2173,9 @@ components:
         email_dispatched:
           type: boolean
           example: true
+        sqs_queued:
+          type: boolean
+          example: true
 
     ChoreComment:
       type: object
@@ -2202,3 +2258,28 @@ components:
           type: object
           additionalProperties: true
           example: {}
+
+    UploadProofPhotoResponse:
+      type: object
+      required:
+        - success
+        - url
+        - s3_key
+        - content_type
+        - size_bytes
+      properties:
+        success:
+          type: boolean
+          example: true
+        url:
+          type: string
+          example: "/api/v1/uploads/photo/proofs/20260924-example.jpg"
+        s3_key:
+          type: string
+          example: "proofs/20260924-example.jpg"
+        content_type:
+          type: string
+          example: "image/jpeg"
+        size_bytes:
+          type: integer
+          example: 10240

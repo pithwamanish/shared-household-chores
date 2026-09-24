@@ -11,6 +11,7 @@ import (
 	"github.com/go-chi/cors"
 
 	"github.com/choresync/backend/internal/auth"
+	"github.com/choresync/backend/internal/cloud"
 	"github.com/choresync/backend/internal/email"
 	"github.com/choresync/backend/internal/handlers"
 	"github.com/choresync/backend/internal/store"
@@ -41,7 +42,11 @@ func tenantGuardMiddleware(next http.Handler) http.Handler {
 }
 
 // NewRouter configures and returns the Chi HTTP router with all ChoreSync routes.
-func NewRouter(s store.Store, em email.Service) http.Handler {
+func NewRouter(s store.Store, em email.Service, storage cloud.StorageService, queue cloud.QueueService) http.Handler {
+	if storage == nil {
+		storage = cloud.NewMockStorageService()
+	}
+
 	r := chi.NewRouter()
 
 	// Global Middleware
@@ -72,7 +77,8 @@ func NewRouter(s store.Store, em email.Service) http.Handler {
 	approvalH := handlers.NewApprovalHandler(s)
 	swapH := handlers.NewSwapHandler(s)
 	rewardH := handlers.NewRewardHandler(s)
-	activityH := handlers.NewActivityHandler(s, em)
+	activityH := handlers.NewActivityHandler(s, em, queue)
+	uploadH := handlers.NewUploadHandler(storage)
 	systemH := handlers.NewSystemHandler(s)
 	authH := handlers.NewAuthHandler(s, em)
 
@@ -96,6 +102,11 @@ func NewRouter(s store.Store, em email.Service) http.Handler {
 		// Dev email inspection (for testing and local verification)
 		api.Get("/dev/emails", authH.GetDevEmails)
 		api.Delete("/dev/emails", authH.ClearDevEmails)
+
+		// Cloud Object Storage (S3 / Floci) - Chore photo proof uploads
+		api.Post("/uploads/photo", uploadH.UploadPhoto)
+		api.Get("/uploads/photo/*", uploadH.GetPhoto)
+		api.Head("/uploads/photo/*", uploadH.GetPhoto)
 
 		// Dev failure and latency simulation endpoints for alert & incident verification
 		api.Get("/dev/simulate-error", func(w http.ResponseWriter, r *http.Request) {

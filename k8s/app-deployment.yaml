@@ -69,6 +69,41 @@ spec:
             configMapKeyRef:
               name: choresync-config
               key: OTEL_SERVICE_NAME
+        - name: AWS_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: AWS_REGION
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_ENDPOINT_URL
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: AWS_ENDPOINT_URL
+        - name: S3_BUCKET_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: S3_BUCKET_NAME
+        - name: SQS_QUEUE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: SQS_QUEUE_NAME
+        - name: ENABLE_CLOUD_SERVICES
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: ENABLE_CLOUD_SERVICES
         readinessProbe:
           httpGet:
             path: /healthz

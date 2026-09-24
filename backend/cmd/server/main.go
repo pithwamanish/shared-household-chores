@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/choresync/backend/internal/cloud"
 	"github.com/choresync/backend/internal/email"
 	"github.com/choresync/backend/internal/server"
 	"github.com/choresync/backend/internal/store"
@@ -65,7 +66,28 @@ func main() {
 	}
 
 	emailService := email.NewServiceFromEnv()
-	handler := server.NewRouter(appStore, emailService)
+
+	// Initialize Cloud Services (AWS / Floci local cloud emulator)
+	cloudCfg := cloud.LoadConfigFromEnv()
+	var storageService cloud.StorageService
+	var queueService cloud.QueueService
+
+	cloudMgr, err := cloud.NewClientManager(context.Background(), cloudCfg)
+	if err != nil {
+		log.Printf("[Cloud] Warning: Failed to initialize AWS/Floci client manager: %v. Using in-memory cloud fallbacks.", err)
+		storageService = cloud.NewMockStorageService()
+		queueService = cloud.NewMockQueueService()
+	} else if cloudMgr.IsEnabled() {
+		log.Printf("[Cloud] Initialized Local Cloud Emulator / AWS (Endpoint: %s, S3: %s, SQS: %s)", cloudCfg.EndpointURL, cloudCfg.S3BucketName, cloudCfg.SQSQueueName)
+		storageService = cloud.NewS3StorageService(cloudMgr)
+		queueService = cloud.NewSQSQueueService(cloudMgr)
+	} else {
+		log.Println("[Cloud] Cloud services disabled or running in mock mode.")
+		storageService = cloud.NewMockStorageService()
+		queueService = cloud.NewMockQueueService()
+	}
+
+	handler := server.NewRouter(appStore, emailService, storageService, queueService)
 
 	srv := &http.Server{
 		Addr:         fmt.Sprintf(":%s", port),
@@ -77,6 +99,9 @@ func main() {
 
 	// Server run context
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
+
+	// Start background SQS reminder worker
+	queueService.StartReminderWorker(serverCtx, emailService)
 
 	// Listen for syscall signals for graceful shutdown
 	sig := make(chan os.Signal, 1)

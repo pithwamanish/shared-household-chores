@@ -29,6 +29,21 @@ services:
       - "${PROD_OTEL_HTTP_PORT:-4321}:4318" # OTLP HTTP receiver
     restart: unless-stopped
 
+  floci:
+    image: floci/floci:latest
+    container_name: choresync-prod-floci
+    ports:
+      - "${PROD_FLOCI_PORT:-4567}:4566"
+    environment:
+      - SERVICES=s3,sqs
+      - DEFAULT_REGION=us-east-1
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/4566"]
+      interval: 3s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
   backend:
     build:
       context: ./backend
@@ -44,11 +59,20 @@ services:
       - DEPLOYMENT_ENVIRONMENT=production
       - SERVICE_VERSION=${SERVICE_VERSION:-prod-latest}
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-test}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-test}
+      - AWS_ENDPOINT_URL=${AWS_ENDPOINT_URL:-http://floci:4566}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-choresync-proofs}
+      - SQS_QUEUE_NAME=${SQS_QUEUE_NAME:-choresync-reminders}
+      - ENABLE_CLOUD_SERVICES=${ENABLE_CLOUD_SERVICES:-true}
     depends_on:
       postgres:
         condition: service_healthy
       otel-collector:
         condition: service_started
+      floci:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
