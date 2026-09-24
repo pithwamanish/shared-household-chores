@@ -994,7 +994,12 @@ function ChoreSyncApp() {
               <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-xs">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h1 className="text-xl font-black text-zinc-900 tracking-tight">Household Chores Board</h1>
+                    <h1 className="text-xl font-black text-zinc-900 tracking-tight flex items-center gap-2">
+                      <span>Household Chores Board</span>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                        v1.1.0 - Kind Rollout Verified
+                      </span>
+                    </h1>
                     <p className="text-xs text-zinc-500 mt-0.5">
                       {activeTasksCount} active tasks remaining • {completedCount} verified completed
                     </p>

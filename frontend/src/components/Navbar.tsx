@@ -84,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
             <div className="hidden sm:block">
               <div className="font-bold text-zinc-900 leading-none tracking-tight text-base">ChoreSync</div>
-              <div className="text-[11px] text-zinc-500 font-medium leading-tight">Shared Home Harmony</div>
+              <div className="text-[11px] text-zinc-500 font-medium leading-tight">Shared Home Harmony • v1.1.0 (Kind Rollout Verified)</div>
             </div>
           </div>
 

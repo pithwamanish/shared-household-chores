@@ -89,6 +89,10 @@ verify: lint test
 ci-local: verify prod-build e2e
 	@echo "All local CI/CD pipeline stages passed successfully!"
 
+act-ci:
+	@echo "Executing Local CI/CD Pipeline via act & Kind..."
+	@run-act-ci
+
 REGISTRY ?= ghcr.io/choresync
 SHORT_SHA ?= $(shell git rev-parse --short=7 HEAD 2>/dev/null || echo "dev")
 TIMESTAMP ?= $(shell date -u +'%Y%m%d-%H%M%S')

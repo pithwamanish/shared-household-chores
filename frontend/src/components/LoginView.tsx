@@ -315,7 +315,12 @@ export const LoginView: React.FC<LoginViewProps> = ({
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-xl shadow-indigo-600/30 mb-3">
             <Sparkles className="w-8 h-8 text-amber-300" />
           </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">ChoreSync</h1>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center justify-center gap-2">
+            <span>ChoreSync</span>
+            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              v1.1.0 - Kind Rollout Verified
+            </span>
+          </h1>
           <p className="text-sm text-zinc-400 mt-1">
             Equitable, flexible household chore coordination & shared home harmony
           </p>
