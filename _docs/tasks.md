@@ -19,6 +19,7 @@ This document tracks all implementation, testing, and infrastructure tasks for *
 | **TASK-009** | External Email & Notification Integration | SWE | `DONE` | `feat/task-009-email-notifications` | None |
 | **TASK-010** | Cloud Deployment & Production Hardening (Render + Neon + Caddy) | SRE | `DONE` | `feat/task-010-cloud-deployment` | None |
 | **TASK-011** | Actionable Alerting & Autonomous Incident Response (Gates 11 & 12) | SRE | `DONE` | `feat/task-011-alerts-incident-response` | None |
+| **TASK-012** | Local Kubernetes Deployment with Kind (Gate 10) | SRE | `DONE` | `feat/task-012-k8s-kind` | None |
 
 ---
 
@@ -455,6 +456,59 @@ Define symptom-based Prometheus alert rules for critical user impact, wire Alert
 - [x] Received alerts normalized according to `payload-schema.json` and saved to `incidents/`
 - [x] `make oncall-verify` passes all 6 gates with zero errors
 - [x] Full regression test suites (Go unit tests and 11 Playwright E2E journeys) pass 100%
+
+---
+
+### TASK-012: Local Kubernetes Deployment with Kind (Gate 10)
+
+## Objective
+Author declarative Kubernetes manifests in `k8s/`, configure PostgreSQL persistent storage with `PersistentVolumeClaim`, define mandatory readiness and liveness probes on all pods, load Docker images into `kind` offline, and implement an automated verification gate script and Makefile targets.
+
+## Context
+- Specifications & Guidelines: [`_docs/kubernetes.md`](kubernetes.md), `AGENTS.md` (Gate 10)
+- Cluster Config: [`k8s/kind-cluster-config.yaml`](../k8s/kind-cluster-config.yaml)
+- Declarative Manifests: [`k8s/`](../k8s/)
+- Verification Suite: [`k8s/verify`](../k8s/verify)
+
+## Scope & File Boundaries
+- **Assigned Role**: SRE
+- **Branch**: `feat/task-012-k8s-kind`
+- **Files created or modified**:
+  - `k8s/kind-cluster-config.yaml`
+  - `k8s/secret.yaml`
+  - `k8s/configmap.yaml`
+  - `k8s/postgres-pvc.yaml`
+  - `k8s/postgres-deployment.yaml`
+  - `k8s/postgres-service.yaml`
+  - `k8s/app-deployment.yaml`
+  - `k8s/app-service.yaml`
+  - `k8s/kustomization.yaml`
+  - `k8s/verify`
+  - `_docs/kubernetes.md`
+  - `_docs/state.md`
+  - `_docs/tasks.md`
+  - `Makefile`
+
+## Subtasks
+- [x] Configure Kind cluster config with NodePort 30080 mapped to hostPort 8090
+- [x] Author decoupled `secret.yaml` and `configmap.yaml` for database and runtime configuration
+- [x] Create `postgres-pvc.yaml` declaring 1Gi PersistentVolumeClaim with `accessModes: [ReadWriteOnce]`
+- [x] Define PostgreSQL deployment mounting PVC at `/var/lib/postgresql/data` with `PGDATA` subpath
+- [x] Define mandatory `pg_isready` readiness and liveness probes for PostgreSQL
+- [x] Implement backend deployment with `wait-for-postgres` initContainer and `/healthz` readiness probe
+- [x] Implement frontend Caddy reverse proxy deployment with `/healthz` readiness probe
+- [x] Configure backend ClusterIP and frontend NodePort (30080) services in `app-service.yaml`
+- [x] Bundle all manifests declaratively using `kustomization.yaml`
+- [x] Implement offline image loading workflow via `kind load docker-image` (zero remote registry dependency)
+- [x] Implement automated verification script `k8s/verify` and `make k8s-verify` target
+- [x] Verify live endpoints via `curl http://localhost:8090/healthz` and `/api/v1/households`
+
+## Acceptance Criteria
+- [x] PostgreSQL PVC is `Bound` and data persists across pod restarts
+- [x] All pods report `1/1 Ready` and `Running` with passing readiness probes
+- [x] `make k8s-verify` passes 100% with zero errors
+- [x] Offline image loading functions with zero external registry network roundtrips
+- [x] Zero drift with `contracts/openapi.yaml` and application domain entities
 
 
 

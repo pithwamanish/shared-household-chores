@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: choresync-config
+  labels:
+    app.kubernetes.io/name: choresync
+    app.kubernetes.io/part-of: choresync
+data:
+  PORT: "8000"
+  EMAIL_PROVIDER: "mock"
+  DEPLOYMENT_ENVIRONMENT: "kubernetes"
+  SERVICE_VERSION: "k8s-local"
+  OTEL_SERVICE_NAME: "api-backend"
+  BACKEND_URL: "backend:8000"

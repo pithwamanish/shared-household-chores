@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -146,6 +146,53 @@ demo-record:
 
 demo-view:
 	@echo "Open http://localhost:3000/demo.html in your browser to watch the interactive demo video."
+
+K8S_CLUSTER ?= choresync-cluster
+
+k8s-cluster:
+	@echo "Ensuring Linux inotify limits for kind..."
+	@docker run --privileged --rm alpine sysctl -w fs.inotify.max_user_instances=512 fs.inotify.max_user_watches=524288 >/dev/null 2>&1 || true
+	@echo "Checking kind cluster $(K8S_CLUSTER)..."
+	@kind get clusters | grep -qx $(K8S_CLUSTER) || kind create cluster --name $(K8S_CLUSTER) --config k8s/kind-cluster-config.yaml
+	@echo "Kind cluster $(K8S_CLUSTER) is active."
+
+k8s-build:
+	@echo "Building application images for Kubernetes..."
+	@docker build -t choresync-backend:dev-latest ./backend
+	@docker build -f ./frontend/Dockerfile.prod -t choresync-frontend:dev-latest ./frontend
+
+k8s-load: k8s-cluster
+	@echo "Loading images into kind cluster $(K8S_CLUSTER) offline..."
+	@kind load docker-image choresync-backend:dev-latest --name $(K8S_CLUSTER)
+	@kind load docker-image choresync-frontend:dev-latest --name $(K8S_CLUSTER)
+	@kind load docker-image postgres:16-alpine --name $(K8S_CLUSTER)
+	@echo "Images loaded successfully into $(K8S_CLUSTER)."
+
+k8s-deploy:
+	@echo "Applying Kubernetes manifests via Kustomize..."
+	@kubectl apply -k k8s/ --context kind-$(K8S_CLUSTER)
+
+k8s-wait:
+	@echo "Waiting for pods to reach Ready state..."
+	@kubectl wait --for=condition=ready pod -l app=postgres --context kind-$(K8S_CLUSTER) --timeout=120s
+	@kubectl rollout status deployment/backend --context kind-$(K8S_CLUSTER) --timeout=120s
+	@kubectl rollout status deployment/frontend --context kind-$(K8S_CLUSTER) --timeout=120s
+	@kubectl wait --for=condition=ready pod --all --context kind-$(K8S_CLUSTER) --timeout=120s
+	@echo "All pods are Ready!"
+
+k8s-verify:
+	@bash k8s/verify
+
+k8s-up: k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify
+	@echo "ChoreSync is running on Kubernetes at http://localhost:8090"
+
+k8s-down:
+	@echo "Deleting kind cluster $(K8S_CLUSTER)..."
+	@kind delete cluster --name $(K8S_CLUSTER) 2>/dev/null || true
+	@echo "Kind cluster deleted."
+
+k8s-logs:
+	@kubectl logs -l app.kubernetes.io/part-of=choresync --all-containers=true -f --context kind-$(K8S_CLUSTER)
 
 
 

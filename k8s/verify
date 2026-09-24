@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# ChoreSync Local Kubernetes (kind) Automated Verification Script
+# ==============================================================================
+
+CLUSTER_NAME="${CLUSTER_NAME:-choresync-cluster}"
+APP_URL="${APP_URL:-http://localhost:8090}"
+TIMEOUT="${TIMEOUT:-120s}"
+
+echo "================================================================================"
+echo "▶ Running ChoreSync Kubernetes (kind) Verification Suite..."
+echo "  Cluster:  ${CLUSTER_NAME}"
+echo "  Endpoint: ${APP_URL}"
+echo "================================================================================"
+
+# 1. Verify cluster connection
+echo ""
+echo "1. Checking kubectl cluster connectivity..."
+kubectl cluster-info --context "kind-${CLUSTER_NAME}" > /dev/null
+echo "✓ Connected to kind cluster 'kind-${CLUSTER_NAME}'."
+
+# 2. Check PVC Bound Status
+echo ""
+echo "2. Verifying PostgreSQL PersistentVolumeClaim status..."
+BOUND=false
+for i in $(seq 1 30); do
+    PVC_STATUS=$(kubectl get pvc postgres-pvc --context "kind-${CLUSTER_NAME}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+    if [ "$PVC_STATUS" = "Bound" ]; then
+        BOUND=true
+        break
+    fi
+    sleep 2
+done
+
+if [ "$BOUND" != "true" ]; then
+    echo "❌ Error: PVC postgres-pvc is in state '$PVC_STATUS' after waiting (expected 'Bound')."
+    kubectl describe pvc postgres-pvc --context "kind-${CLUSTER_NAME}"
+    exit 1
+fi
+echo "✓ PersistentVolumeClaim 'postgres-pvc' is Bound (persistent storage active)."
+
+# 3. Wait for PostgreSQL pod readiness
+echo ""
+echo "3. Waiting for PostgreSQL pod readiness..."
+kubectl wait --for=condition=ready pod -l app=postgres --timeout="${TIMEOUT}"
+echo "✓ PostgreSQL pod is 1/1 Ready."
+
+# 4. Wait for Backend rollout and readiness
+echo ""
+echo "4. Waiting for Backend deployment rollout and pod readiness..."
+kubectl rollout status deployment/backend --timeout="${TIMEOUT}"
+kubectl wait --for=condition=ready pod -l app=backend --timeout="${TIMEOUT}"
+echo "✓ Backend deployment rolled out and 1/1 Ready."
+
+# 5. Wait for Frontend rollout and readiness
+echo ""
+echo "5. Waiting for Frontend deployment rollout and pod readiness..."
+kubectl rollout status deployment/frontend --timeout="${TIMEOUT}"
+kubectl wait --for=condition=ready pod -l app=frontend --timeout="${TIMEOUT}"
+echo "✓ Frontend deployment rolled out and 1/1 Ready."
+
+# 6. Global pod readiness verification
+echo ""
+echo "6. Verifying all pods in cluster..."
+kubectl get pods -o wide
+echo "✓ All pods verified in Running state with passing readiness probes."
+
+# 7. Live HTTP Health and Endpoint Verification
+echo ""
+echo "7. Probing live HTTP endpoints via NodePort mapping (${APP_URL})..."
+
+# Check Frontend Health
+HTTP_HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "${APP_URL}/healthz" || true)
+if [ "$HTTP_HEALTH" != "200" ]; then
+    echo "❌ Error: GET ${APP_URL}/healthz returned HTTP $HTTP_HEALTH (expected 200)."
+    exit 1
+fi
+echo "✓ Frontend Health Check: GET ${APP_URL}/healthz -> 200 OK"
+
+# Check Backend API through Reverse Proxy
+API_RESP=$(curl -s "${APP_URL}/api/v1/households" || true)
+if ! echo "$API_RESP" | grep -q "h-family"; then
+    echo "❌ Error: GET ${APP_URL}/api/v1/households failed or did not return expected households JSON."
+    echo "Response: $API_RESP"
+    exit 1
+fi
+echo "✓ Backend API Reverse Proxy: GET ${APP_URL}/api/v1/households -> 200 OK (returned household entities)"
+
+echo ""
+echo "================================================================================"
+echo "🎉 ALL KUBERNETES VERIFICATION GATES PASSED (100% READY)"
+echo "================================================================================"

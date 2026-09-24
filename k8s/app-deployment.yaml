@@ -1,0 +1,161 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: choresync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        app.kubernetes.io/name: backend
+        app.kubernetes.io/part-of: choresync
+    spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: postgres:16-alpine
+        imagePullPolicy: IfNotPresent
+        command:
+        - sh
+        - -c
+        - until pg_isready -h postgres -p 5432 -U choresync -d choresync; do echo waiting for postgres; sleep 2; done
+      containers:
+      - name: backend
+        image: choresync-backend:dev-latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: PORT
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: PORT
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: choresync-secret
+              key: DATABASE_URL
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: choresync-secret
+              key: JWT_SECRET
+        - name: EMAIL_PROVIDER
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: EMAIL_PROVIDER
+        - name: DEPLOYMENT_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: DEPLOYMENT_ENVIRONMENT
+        - name: SERVICE_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: SERVICE_VERSION
+        - name: OTEL_SERVICE_NAME
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: OTEL_SERVICE_NAME
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8000
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 300m
+            memory: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  labels:
+    app: frontend
+    app.kubernetes.io/name: frontend
+    app.kubernetes.io/part-of: choresync
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        app.kubernetes.io/name: frontend
+        app.kubernetes.io/part-of: choresync
+    spec:
+      containers:
+      - name: frontend
+        image: choresync-frontend:dev-latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: PORT
+          value: "80"
+        - name: BACKEND_URL
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: BACKEND_URL
+        - name: DEPLOYMENT_ENVIRONMENT
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: DEPLOYMENT_ENVIRONMENT
+        - name: SERVICE_VERSION
+          valueFrom:
+            configMapKeyRef:
+              name: choresync-config
+              key: SERVICE_VERSION
+        - name: OTEL_SERVICE_NAME
+          value: "caddy-proxy"
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 3
+          periodSeconds: 5
+          timeoutSeconds: 3
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
