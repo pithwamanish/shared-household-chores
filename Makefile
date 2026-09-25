@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-mcp-test ext-capabilities
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -198,6 +198,20 @@ k8s-down:
 k8s-logs:
 	@kubectl logs -l app.kubernetes.io/part-of=choresync --all-containers=true -f --context kind-$(K8S_CLUSTER)
 
+ext-verify:
+	@echo "Verifying Agent Extension Pack compliance (agent-plugins.org / AAIF)..."
+	@verify-extension-pack
 
+ext-mcp-test:
+	@echo "Testing ChoreSync MCP server initialize..."
+	@echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}' | python3 mcp-server/server.py
+	@echo "Testing ChoreSync MCP server tools/list..."
+	@echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}' | python3 mcp-server/server.py
 
-
+ext-capabilities:
+	@echo "Running Contract Audit Capability..."
+	@bash agent-capabilities/contract-audit/scripts/audit-contract.sh
+	@echo "Running Database Schema Migration Capability..."
+	@bash agent-capabilities/db-migration-runner/scripts/check-migrations.sh
+	@echo "Running Cluster Health Prober Capability..."
+	@bash agent-capabilities/cluster-health-prober/scripts/probe-cluster.sh

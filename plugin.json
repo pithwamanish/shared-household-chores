@@ -1,0 +1,69 @@
+{
+  "$schema": "https://agent-plugins.org/v1/schema.json",
+  "name": "choresync-agent-extension-pack",
+  "version": "1.0.0",
+  "description": "Portable Agent Extension Pack for ChoreSync conforming to the Agent Plugins open standard (agent-plugins.org / AAIF). Bundles chore workflow capabilities, MCP inspection server, specialist personas, guardrail hooks, and least-privilege security policies.",
+  "author": {
+    "name": "ChoreSync AI-Native Engineering Team"
+  },
+  "capabilities": [
+    {
+      "name": "contract-audit",
+      "path": "agent-capabilities/contract-audit/SKILL.md",
+      "description": "Audits OpenAPI 3.1 contract endpoints, request/response models, and status codes against Go backend handlers and TypeScript frontend client"
+    },
+    {
+      "name": "db-migration-runner",
+      "path": "agent-capabilities/db-migration-runner/SKILL.md",
+      "description": "Inspects PostgreSQL database schema, verifies table definitions, and validates migration status across relational entities"
+    },
+    {
+      "name": "cluster-health-prober",
+      "path": "agent-capabilities/cluster-health-prober/SKILL.md",
+      "description": "Probes running multi-tier cluster health across Go backend, Caddy reverse proxy, PostgreSQL, and Floci S3/SQS cloud emulator"
+    }
+  ],
+  "hooks": {
+    "config": "agent-hooks/hooks.json",
+    "preToolCall": "agent-hooks/pre-tool-guardrail.sh",
+    "postToolCall": "agent-hooks/post-tool-audit.sh"
+  },
+  "mcpServers": {
+    "choresync-tools": {
+      "manifest": "mcp-server/mcp.json",
+      "command": "python3",
+      "args": ["mcp-server/server.py"]
+    }
+  },
+  "agents": [
+    {
+      "name": "chore-domain-specialist",
+      "role": "ChoreSync Domain & Architecture Specialist",
+      "definition": "custom-agent/specialist.md"
+    }
+  ],
+  "documentation": {
+    "overview": "docs/agent-extension-pack.md",
+    "permissions": "docs/permissions.md"
+  },
+  "permissions": {
+    "level": "restricted",
+    "allowlistedCommands": [
+      "docker compose ps",
+      "docker compose logs",
+      "docker compose exec",
+      "docker compose run --rm",
+      "curl -s http://localhost:*/healthz",
+      "python3 mcp-server/server.py",
+      "make k8s-verify",
+      "make oncall-verify"
+    ],
+    "deniedCommands": [
+      "rm -rf /",
+      "DROP DATABASE",
+      "TRUNCATE TABLE",
+      "DELETE FROM * WHERE 1=1",
+      "git push --force origin main"
+    ]
+  }
+}

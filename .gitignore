@@ -24,9 +24,10 @@ e2e/*.png
 coverage/
 *.lcov
 
-# Ephemeral On-Call Incidents
+# Ephemeral On-Call Incidents & Agent Audit Logs
 on-call-engineer/incidents/*.json
 !on-call-engineer/incidents/.gitkeep
+agent-hooks/audit.log
 
 # Environment Variables & Secrets
 .env

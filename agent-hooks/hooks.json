@@ -1,0 +1,22 @@
+{
+  "$schema": "https://agent-plugins.org/v1/hooks-schema.json",
+  "version": "1.0.0",
+  "hooks": [
+    {
+      "name": "destructive-command-guardrail",
+      "event": "pre-tool-execution",
+      "executable": "agent-hooks/pre-tool-guardrail.sh",
+      "timeoutSeconds": 5,
+      "blocking": true,
+      "description": "Intercepts commands to block irreversible deletion, unparameterized database drops, and credential leaks."
+    },
+    {
+      "name": "audit-logger",
+      "event": "post-tool-execution",
+      "executable": "agent-hooks/post-tool-audit.sh",
+      "timeoutSeconds": 5,
+      "blocking": false,
+      "description": "Records tool invocation telemetry and exit codes for auditing."
+    }
+  ]
+}
