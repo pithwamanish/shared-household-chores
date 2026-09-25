@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Mail, Lock, UserPlus, KeyRound, ArrowRight, CheckCircle2, Home, Users, Tablet, ShieldCheck } from 'lucide-react';
+import { Sparkles, Mail, Lock, UserPlus, KeyRound, ArrowRight, CheckCircle2, Home, Users, ShieldCheck } from 'lucide-react';
 import { api } from '../services/api';
 import { Household, AuthTokenResponse, HouseholdMode } from '../types';
 import {
@@ -932,25 +932,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
-            </div>
-          )}
-
-          {/* Shared Kitchen Kiosk Quick Shortcut */}
-          {onEnterKioskMode && (
-            <div className="mt-6 pt-5 border-t border-zinc-700/60 flex items-center justify-between">
-              <div className="text-xs text-zinc-400">
-                <span className="font-semibold text-zinc-300">Kitchen Fridge Tablet?</span>
-                <p className="text-[11px] text-zinc-500">Shared touch display for counter or fridge</p>
-              </div>
-              <button
-                type="button"
-                id="launch-kiosk-btn"
-                onClick={onEnterKioskMode}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-xs font-bold text-white transition-colors cursor-pointer"
-              >
-                <Tablet className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Launch Kiosk Display</span>
-              </button>
             </div>
           )}
         </div>
