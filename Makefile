@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-mcp-test ext-capabilities
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -201,6 +201,10 @@ k8s-logs:
 ext-verify:
 	@echo "Verifying Agent Extension Pack compliance (agent-plugins.org / AAIF)..."
 	@verify-extension-pack
+
+ext-eval:
+	@echo "Evaluating Agent Extension Pack Conformance & Domain Alignment (Gate 14)..."
+	@evaluate-extension-pack
 
 ext-mcp-test:
 	@echo "Testing ChoreSync MCP server initialize..."
