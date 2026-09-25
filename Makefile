@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities spec-drift mutation-test evals quality-reinforce
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -238,3 +238,19 @@ ext-capabilities:
 	@bash agent-capabilities/db-migration-runner/scripts/check-migrations.sh
 	@echo "Running Cluster Health Prober Capability..."
 	@bash agent-capabilities/cluster-health-prober/scripts/probe-cluster.sh
+
+spec-drift:
+	@echo "Auditing living contract & spec drift (Gate 15)..."
+	@verify-spec-drift
+
+mutation-test:
+	@echo "Running containerized mutation testing & anti-tautology scan (Gate 15)..."
+	@run-mutation-test
+
+evals:
+	@echo "Running continuous agent & domain evaluation harness (Gate 15)..."
+	@python3 evals/eval_runner.py
+
+quality-reinforce: spec-drift mutation-test evals
+	@echo "All Gate 15 Quality Reinforcement checks passed successfully!"
+

@@ -1,0 +1,67 @@
+[
+  {
+    "id": "eval-001",
+    "description": "Verify ChoreSync core domain entities and household modes in specifications",
+    "target_artifact": "_docs/specs.md",
+    "expected_keywords": ["household", "member", "chore", "swap", "reward", "flatmates", "families", "couples"],
+    "assertions": [
+      {"type": "contains_all", "values": ["household", "member", "chore", "swap", "reward"]},
+      {"type": "contains_any", "values": ["flatmate", "flatmates", "roommates"]}
+    ]
+  },
+  {
+    "id": "eval-002",
+    "description": "Verify frozen OpenAPI 3.1 contract endpoints and operation parity",
+    "target_artifact": "contracts/openapi.yaml",
+    "expected_keywords": ["/api/auth/login", "/api/auth/magic-link", "/api/households", "/api/swaps", "/api/uploads/photo", "/api/reset"],
+    "assertions": [
+      {"type": "contains_all", "values": ["/api/auth/login", "/api/households", "/api/swaps", "/api/uploads/photo"]},
+      {"type": "min_path_count", "value": 10}
+    ]
+  },
+  {
+    "id": "eval-003",
+    "description": "Verify immutable project constitution and negative invariants in AGENTS.md",
+    "target_artifact": "AGENTS.md",
+    "expected_keywords": ["contract-first", "point balances", "approval", "verification"],
+    "assertions": [
+      {"type": "contains_all", "values": ["contract", "approval", "point balances"]}
+    ]
+  },
+  {
+    "id": "eval-004",
+    "description": "Verify local cloud emulator integration (Floci AWS S3 & SQS) in architecture",
+    "target_artifact": "_docs/stack.md",
+    "expected_keywords": ["floci", "s3", "sqs", "choresync-proofs", "choresync-reminders"],
+    "assertions": [
+      {"type": "contains_all", "values": ["floci", "s3", "sqs"]}
+    ]
+  },
+  {
+    "id": "eval-005",
+    "description": "Verify autonomous on-call autonomy policy and recovery tiers",
+    "target_artifact": "on-call-engineer/autonomy-policy.json",
+    "expected_keywords": ["allowlisted_actions", "level_1_auto_execute", "rollback", "restart_service"],
+    "assertions": [
+      {"type": "contains_all", "values": ["allowlisted_actions", "rollback", "restart_service"]}
+    ]
+  },
+  {
+    "id": "eval-006",
+    "description": "Verify relational PostgreSQL DDL schema table count and integrity",
+    "target_artifact": "backend/internal/db/schema.sql",
+    "expected_keywords": ["households", "members", "chores", "chore_swap_requests", "reward_items", "reward_redemptions", "password_reset_tokens"],
+    "assertions": [
+      {"type": "contains_all", "values": ["households", "members", "chores", "chore_swap_requests", "reward_items", "reward_redemptions", "password_reset_tokens"]}
+    ]
+  },
+  {
+    "id": "eval-007",
+    "description": "Verify Agent Extension Pack manifest and MCP tool definitions",
+    "target_artifact": "plugin.json",
+    "expected_keywords": ["choresync-agent-extension-pack", "capabilities", "hooks", "mcpservers"],
+    "assertions": [
+      {"type": "contains_all", "values": ["choresync-agent-extension-pack", "capabilities", "hooks", "mcpservers"]}
+    ]
+  }
+]
