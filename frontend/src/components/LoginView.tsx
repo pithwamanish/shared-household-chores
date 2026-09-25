@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, Mail, Lock, UserPlus, KeyRound, ArrowRight, CheckCircle2, Home, Users, Tablet, Inbox, ShieldCheck, Video } from 'lucide-react';
+import { Sparkles, Mail, Lock, UserPlus, KeyRound, ArrowRight, CheckCircle2, Home, Users, Tablet, ShieldCheck } from 'lucide-react';
 import { api } from '../services/api';
 import { Household, AuthTokenResponse, HouseholdMode } from '../types';
-import { DevMailboxModal } from './DevMailboxModal';
+import {
+  isSupabaseConfigured,
+  supabase,
+  updateSupabasePassword,
+  getSupabaseSession,
+  onSupabaseAuthStateChange,
+} from '../services/supabase';
 
 interface LoginViewProps {
   onLoginSuccess: (authData: AuthTokenResponse) => void;
@@ -52,87 +58,102 @@ export const LoginView: React.FC<LoginViewProps> = ({
 
   // Reset password state
   const [resetToken, setResetToken] = useState('');
+  const [isRecoverySession, setIsRecoverySession] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState(false);
 
-  // Dev mailbox modal
-  const [isMailboxOpen, setIsMailboxOpen] = useState(false);
 
-  // Check URL parameters for reset or magic tokens
+  // Check URL parameters and Supabase auth state for magic links or resets
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    const hash = window.location.hash || '';
+
+    // 1. Native reset token
     const resetTok = params.get('reset_token');
     if (resetTok) {
       setResetToken(resetTok);
       setActiveTab('reset');
     }
+
+    // 2. Supabase password recovery
+    if (params.get('reset_password') === 'true' || hash.includes('type=recovery')) {
+      setActiveTab('reset');
+      setIsRecoverySession(true);
+    }
+
+    // 3. Native magic token (?magic_token=...) - prefill if arriving directly
     const magicTok = params.get('magic_token');
     if (magicTok) {
       setMagicCode(magicTok);
       setActiveTab('magic');
-      setIsVerifyingMagic(true);
-      setMagicError('');
-      api.verifyMagicLink(magicTok.trim())
-        .then((res) => {
-          onLoginSuccess(res);
-        })
-        .catch((err: any) => {
-          setMagicError(err?.message || 'Invalid or expired magic link. Magic links are single-use and expire after 15 minutes.');
-        })
-        .finally(() => {
+    }
+
+    // 4. Supabase Magic Link / Auth redirect handling
+    if (isSupabaseConfigured && supabase) {
+      const handleSupabaseSession = async (session: any) => {
+        if (!session?.access_token || !session?.user?.email) return;
+
+        // Recovery session: allow user to input new password without auto-signing in to dashboard
+        if (hash.includes('type=recovery') || params.get('reset_password') === 'true') {
+          setActiveTab('reset');
+          setIsRecoverySession(true);
+          return;
+        }
+
+        setIsVerifyingMagic(true);
+        setActiveTab('magic');
+        setMagicMessage('Authenticating with Supabase...');
+        try {
+          const authData = await api.supabaseLogin(
+            session.access_token,
+            session.user.email,
+            session.user.user_metadata?.name || ''
+          );
+          // Clean hash/query params from URL
+          window.history.replaceState({}, '', window.location.pathname);
+          onLoginSuccess(authData);
+        } catch (err: any) {
+          console.error('Supabase session exchange error:', err);
+          setMagicError(err?.message || 'Failed to authenticate Supabase session.');
+        } finally {
           setIsVerifyingMagic(false);
-        });
+        }
+      };
+
+      // Check existing session
+      getSupabaseSession().then((session) => {
+        if (session && (hash.includes('type=recovery') || params.get('reset_password') === 'true')) {
+          setActiveTab('reset');
+          setIsRecoverySession(true);
+        } else if (session && (hash.includes('access_token') || params.has('code'))) {
+          handleSupabaseSession(session);
+        }
+      });
+
+      // Listen for incoming auth state changes
+      const unsubscribe = onSupabaseAuthStateChange((event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          setActiveTab('reset');
+          setIsRecoverySession(true);
+        } else if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session) {
+          if (window.location.hash.includes('type=recovery') || params.get('reset_password') === 'true') {
+            setActiveTab('reset');
+            setIsRecoverySession(true);
+          } else {
+            handleSupabaseSession(session);
+          }
+        }
+      });
+
+      return () => {
+        unsubscribe();
+      };
     }
   }, [onLoginSuccess]);
 
-  // Demo accounts for quick credentials population
-  const demoAccounts = [
-    {
-      id: 'm-sarah',
-      name: 'Sarah Chen',
-      email: 'sarah@example.com',
-      password: 'password123',
-      role: 'Admin',
-      household: 'Apartment 4B',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 'm-liam',
-      name: 'Liam Vance',
-      email: 'liam@example.com',
-      password: 'password123',
-      role: 'Member',
-      household: 'Apartment 4B',
-      avatar: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=120&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 'm-david-fam',
-      name: 'David (Dad)',
-      email: 'david@miller.family',
-      password: 'password123',
-      role: 'Admin',
-      household: 'The Miller Family',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80',
-    },
-    {
-      id: 'm-alex',
-      name: 'Alex',
-      email: 'alex@example.com',
-      password: 'password123',
-      role: 'Admin',
-      household: 'Alex & Sam',
-      avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=120&auto=format&fit=crop&q=80',
-    },
-  ];
-
-  const fillDemoCredentials = (email: string, pass: string) => {
-    setLoginEmail(email);
-    setLoginPassword(pass);
-    setLoginError('');
-  };
 
   // Submit Password Login
   const handlePasswordLogin = async (e: React.FormEvent) => {
@@ -257,10 +278,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   // Reset Password submission
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetToken.trim()) {
-      setResetError('Password reset token is required.');
-      return;
-    }
     if (!newPassword.trim() || newPassword.length < 6) {
       setResetError('Password must be at least 6 characters.');
       return;
@@ -272,6 +289,31 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setIsResetting(true);
     setResetError('');
     try {
+      if (isSupabaseConfigured && supabase) {
+        const { error: sbErr } = await updateSupabasePassword(newPassword.trim());
+        if (!sbErr) {
+          const session = await getSupabaseSession();
+          if (session?.user?.email) {
+            const authData = await api.supabaseLogin(
+              session.access_token,
+              session.user.email,
+              undefined,
+              newPassword.trim()
+            );
+            setResetSuccess(true);
+            setTimeout(() => {
+              window.history.replaceState({}, '', window.location.pathname);
+              onLoginSuccess(authData);
+            }, 800);
+            return;
+          }
+        }
+      }
+
+      if (!resetToken.trim()) {
+        setResetError('Password reset token is required.');
+        return;
+      }
       const authData = await api.resetPassword(resetToken.trim(), newPassword.trim());
       setResetSuccess(true);
       setTimeout(() => {
@@ -287,29 +329,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   return (
     <div className="min-h-screen bg-zinc-900 text-zinc-100 flex flex-col justify-center items-center p-4 sm:p-6 font-sans">
       <div className="w-full max-w-xl">
-        {/* Top Action Bar (Dev Mailbox & Architecture Video) */}
-        <div className="flex justify-end items-center gap-2 mb-3">
-          <a
-            href="/demo.html"
-            target="_blank"
-            rel="noreferrer"
-            id="open-architecture-video-btn"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-950/60 hover:bg-sky-900/60 border border-sky-600/40 text-xs font-semibold text-sky-300 hover:text-white transition-colors cursor-pointer shadow-sm"
-          >
-            <Video className="w-3.5 h-3.5 text-sky-400" />
-            <span>🎬 Architecture Tour Video</span>
-          </a>
-          <button
-            type="button"
-            id="open-dev-mailbox-btn"
-            onClick={() => setIsMailboxOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 border border-zinc-700 text-xs font-semibold text-zinc-300 hover:text-white transition-colors cursor-pointer shadow-sm"
-          >
-            <Inbox className="w-3.5 h-3.5 text-indigo-400" />
-            <span>📬 Dev Mailbox</span>
-          </button>
-        </div>
-
         {/* Brand Header */}
         <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-indigo-600 shadow-xl shadow-indigo-600/30 mb-3">
@@ -317,9 +336,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
           </div>
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white flex items-center justify-center gap-2">
             <span>ChoreSync</span>
-            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-              v1.1.0 - Kind Rollout Verified
-            </span>
           </h1>
           <p className="text-sm text-zinc-400 mt-1">
             Equitable, flexible household chore coordination & shared home harmony
@@ -404,21 +420,17 @@ export const LoginView: React.FC<LoginViewProps> = ({
                     >
                       Password
                     </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-zinc-500">Default: password123</span>
-                      <span className="text-zinc-600">•</span>
-                      <button
-                        type="button"
-                        id="forgot-password-link"
-                        onClick={() => {
-                          setForgotEmail(loginEmail);
-                          setActiveTab('forgot');
-                        }}
-                        className="text-[11px] text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer"
-                      >
-                        Forgot password?
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      id="forgot-password-link"
+                      onClick={() => {
+                        setForgotEmail(loginEmail);
+                        setActiveTab('forgot');
+                      }}
+                      className="text-[11px] text-indigo-400 hover:text-indigo-300 underline font-medium cursor-pointer"
+                    >
+                      Forgot password?
+                    </button>
                   </div>
                   <div className="relative">
                     <Lock className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -453,40 +465,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
-
-              {/* Quick Fill Demo Credentials Bar */}
-              <div className="pt-4 border-t border-zinc-700/60">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
-                    Demo Credentials (Click to prefill)
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  {demoAccounts.map((acc) => (
-                    <button
-                      key={acc.id}
-                      type="button"
-                      id={`quick-fill-${acc.id}`}
-                      onClick={() => fillDemoCredentials(acc.email, acc.password)}
-                      className="flex items-center gap-2 p-2 rounded-xl bg-zinc-900/60 hover:bg-zinc-700/60 border border-zinc-700/60 text-left transition-colors cursor-pointer group"
-                    >
-                      <img
-                        src={acc.avatar}
-                        alt={acc.name}
-                        className="w-8 h-8 rounded-full object-cover shrink-0 border border-zinc-600 group-hover:border-indigo-400"
-                      />
-                      <div className="min-w-0">
-                        <div className="text-xs font-bold text-white group-hover:text-indigo-300 truncate">
-                          {acc.name}
-                        </div>
-                        <div className="text-[10px] text-zinc-400 truncate">
-                          {acc.role} • {acc.household}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
             </div>
           )}
 
@@ -658,13 +636,20 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <span>Magic links are single-use and expire after 15 minutes.</span>
               </div>
 
+              {isSupabaseConfigured && (
+                <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-emerald-300 text-xs">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Public Alpha Delivery: Powered by Supabase Auth (noreply@mail.app.supabase.io)</span>
+                </div>
+              )}
+
               <form onSubmit={handleRequestMagicLink} className="space-y-3">
                 <div>
                   <label
                     htmlFor="magic-email-input"
                     className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1.5"
                   >
-                    Your Registered Email
+                    Your Email Address
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -674,7 +659,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       required
                       value={magicEmail}
                       onChange={(e) => setMagicEmail(e.target.value)}
-                      placeholder="sarah@example.com"
+                      placeholder="your-email@example.com"
                       className="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2.5 pl-9 pr-3 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
@@ -686,7 +671,11 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   disabled={isRequestingMagic}
                   className="w-full bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all cursor-pointer flex items-center justify-center gap-2 shadow-md shadow-indigo-600/30 disabled:opacity-50"
                 >
-                  {isRequestingMagic ? 'Sending Code...' : 'Send Magic Login Code'}
+                  {isRequestingMagic
+                    ? 'Sending Link...'
+                    : isSupabaseConfigured
+                    ? 'Send 1-Click Magic Login Link'
+                    : 'Send Magic Login Code'}
                 </button>
               </form>
 
@@ -700,6 +689,23 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 <div className="p-3 rounded-xl bg-emerald-950/70 border border-emerald-800 text-emerald-300 text-xs flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
                   <span>{magicMessage}</span>
+                </div>
+              )}
+
+              {sentCode && (
+                <div className="p-3 rounded-xl bg-indigo-950/70 border border-indigo-700/80 flex items-center justify-between gap-3 text-xs">
+                  <div className="truncate">
+                    <span className="text-zinc-400 block text-[10px] uppercase font-bold">Instant Login Token</span>
+                    <span className="font-mono text-indigo-200 font-bold">{sentCode}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => handleVerifyMagicCode(e)}
+                    disabled={isVerifyingMagic}
+                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs cursor-pointer transition-colors shadow shrink-0"
+                  >
+                    {isVerifyingMagic ? 'Signing In...' : 'Sign In Now →'}
+                  </button>
                 </div>
               )}
 
@@ -799,7 +805,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                       <span>{forgotMessage}</span>
                     </div>
                     <p className="text-[11px] text-emerald-400/80">
-                      Check your transactional mailbox outbox above to inspect the reset email.
+                      Check your email inbox for the password reset link or code.
                     </p>
                     <div className="pt-1 flex items-center gap-2">
                       <button
@@ -846,28 +852,46 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </button>
               </div>
 
-              <p className="text-xs text-zinc-400 leading-relaxed">
-                Provide your password reset token and choose a new secure password (minimum 6 characters).
-              </p>
+              {isRecoverySession ? (
+                <div className="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/80 text-emerald-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>
+                    <strong>Verified via Reset Link:</strong> No reset code required! Enter your new password below.
+                  </span>
+                </div>
+              ) : resetToken ? (
+                <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-800/80 text-indigo-300 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span>
+                    <strong>Reset code loaded from link:</strong> Choose your new password below.
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Provide your password reset token and choose a new secure password (minimum 6 characters).
+                </p>
+              )}
 
               <form onSubmit={handleResetPassword} className="space-y-3.5">
-                <div>
-                  <label
-                    htmlFor="reset-token-input"
-                    className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1"
-                  >
-                    Reset Token
-                  </label>
-                  <input
-                    id="reset-token-input"
-                    type="text"
-                    required
-                    value={resetToken}
-                    onChange={(e) => setResetToken(e.target.value)}
-                    placeholder="Paste reset token from email"
-                    className="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2 px-3 text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
-                  />
-                </div>
+                {!isRecoverySession && !resetToken && (
+                  <div>
+                    <label
+                      htmlFor="reset-token-input"
+                      className="block text-xs font-bold uppercase tracking-wider text-zinc-400 mb-1"
+                    >
+                      Reset Token
+                    </label>
+                    <input
+                      id="reset-token-input"
+                      type="text"
+                      required={!isRecoverySession && !resetToken}
+                      value={resetToken}
+                      onChange={(e) => setResetToken(e.target.value)}
+                      placeholder="Paste reset token from email"
+                      className="w-full bg-zinc-900 border border-zinc-700 rounded-xl py-2 px-3 text-sm text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-indigo-500"
+                    />
+                  </div>
+                )}
 
                 <div>
                   <label
@@ -958,33 +982,10 @@ export const LoginView: React.FC<LoginViewProps> = ({
         </div>
       </div>
 
-      {/* Dev Mailbox Modal */}
-      <DevMailboxModal
-        isOpen={isMailboxOpen}
-        onClose={() => setIsMailboxOpen(false)}
-        onSelectResetToken={(token) => {
-          setResetToken(token);
-          setActiveTab('reset');
-          setIsMailboxOpen(false);
-        }}
-        onSelectMagicToken={(token) => {
-          setMagicCode(token);
-          setActiveTab('magic');
-          setIsMailboxOpen(false);
-          setIsVerifyingMagic(true);
-          setMagicError('');
-          api.verifyMagicLink(token.trim())
-            .then((res) => {
-              onLoginSuccess(res);
-            })
-            .catch((err: any) => {
-              setMagicError(err?.message || 'Invalid or expired magic link.');
-            })
-            .finally(() => {
-              setIsVerifyingMagic(false);
-            });
-        }}
-      />
+      {/* Version Label at bottom-right corner */}
+      <div className="fixed bottom-3 right-3 sm:bottom-4 sm:right-4 z-40 text-[11px] font-medium px-2.5 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 shadow-md backdrop-blur-xs select-none pointer-events-none">
+        v1.1.0 - Kind Rollout Verified
+      </div>
     </div>
   );
 };
