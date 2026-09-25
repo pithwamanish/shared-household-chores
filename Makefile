@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities spec-drift mutation-test evals quality-reinforce
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities spec-drift mutation-test evals quality-reinforce ai-docs repo-verify
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -14,6 +14,15 @@ compat:
 	@ln -sf specs.md _docs/plan.md 2>/dev/null || true
 	@ln -sf _docs/specs.md PLAN.md 2>/dev/null || true
 	@ln -sf _docs/specs.md PRD.md 2>/dev/null || true
+	@ln -sf _docs/specs.md product-spec.md 2>/dev/null || true
+	@ln -sf AGENTS.md constitution.md 2>/dev/null || true
+	@mkdir -p .spec && ln -sf ../constitution.md .spec/constitution.md 2>/dev/null || true
+	@ln -sf contracts/openapi.yaml openapi.yaml 2>/dev/null || true
+	@ln -sfn security-audit security 2>/dev/null || true
+	@ln -sfn observability ops 2>/dev/null || true
+	@ln -sfn custom-agent .bmad 2>/dev/null || true
+	@ln -sfn skills agent-capabilities 2>/dev/null || true
+	@ln -sfn com.antigravity.client/hooks agent-hooks 2>/dev/null || true
 	@echo "Compatibility bridges active!"
 
 setup: compat
@@ -233,11 +242,13 @@ ext-mcp-test:
 
 ext-capabilities:
 	@echo "Running Contract Audit Capability..."
-	@bash agent-capabilities/contract-audit/scripts/audit-contract.sh
+	@bash skills/contract-audit/scripts/audit-contract.sh
 	@echo "Running Database Schema Migration Capability..."
-	@bash agent-capabilities/db-migration-runner/scripts/check-migrations.sh
+	@bash skills/db-migration-runner/scripts/check-migrations.sh
 	@echo "Running Cluster Health Prober Capability..."
-	@bash agent-capabilities/cluster-health-prober/scripts/probe-cluster.sh
+	@bash skills/cluster-health-prober/scripts/probe-cluster.sh
+	@echo "Running Chore Lifecycle Manager Capability..."
+	@bash skills/chore-lifecycle-manager/scripts/verify-chore-flows.sh
 
 spec-drift:
 	@echo "Auditing living contract & spec drift (Gate 15)..."
@@ -253,4 +264,12 @@ evals:
 
 quality-reinforce: spec-drift mutation-test evals
 	@echo "All Gate 15 Quality Reinforcement checks passed successfully!"
+
+ai-docs:
+	@echo "Scaffolding AI Tools Usage & Review documentation and canonical bridges..."
+	@setup-ai-docs
+
+repo-verify:
+	@echo "Verifying canonical repository contents and AI review compliance (Gate 16)..."
+	@verify-repo-contents
 
