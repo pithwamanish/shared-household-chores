@@ -43,7 +43,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   // Magic link state
   const [magicEmail, setMagicEmail] = useState('');
   const [magicCode, setMagicCode] = useState('');
-  const [sentCode, setSentCode] = useState('');
   const [isRequestingMagic, setIsRequestingMagic] = useState(false);
   const [isVerifyingMagic, setIsVerifyingMagic] = useState(false);
   const [magicMessage, setMagicMessage] = useState('');
@@ -54,7 +53,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
   const [isRequestingForgot, setIsRequestingForgot] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [forgotError, setForgotError] = useState('');
-  const [forgotToken, setForgotToken] = useState('');
 
   // Reset password state
   const [resetToken, setResetToken] = useState('');
@@ -223,11 +221,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setMagicMessage('');
     try {
       const res = await api.requestMagicLink(magicEmail.trim());
-      setMagicMessage(res.message || 'Login code sent to email!');
-      if (res.token) {
-        setSentCode(res.token);
-        setMagicCode(res.token);
-      }
+      setMagicMessage(res.message || `Magic login link sent to ${magicEmail.trim()}! Please check your email inbox.`);
     } catch (err: any) {
       setMagicError(err?.message || 'Could not send login link.');
     } finally {
@@ -238,7 +232,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
   // Magic Link Verification
   const handleVerifyMagicCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    const token = magicCode.trim() || sentCode.trim();
+    const token = magicCode.trim();
     if (!token) return;
     setIsVerifyingMagic(true);
     setMagicError('');
@@ -264,10 +258,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
     setForgotMessage('');
     try {
       const res = await api.requestPasswordReset(forgotEmail.trim());
-      setForgotMessage(res.message || 'Password reset link sent! Check your inbox.');
-      if (res.token) {
-        setResetToken(res.token);
-      }
+      setForgotMessage(res.message || `Password reset link sent to ${forgotEmail.trim()}! Please check your email inbox.`);
     } catch (err: any) {
       setForgotError(err?.message || 'Failed to request password reset.');
     } finally {
@@ -692,23 +683,6 @@ export const LoginView: React.FC<LoginViewProps> = ({
                 </div>
               )}
 
-              {sentCode && (
-                <div className="p-3 rounded-xl bg-indigo-950/70 border border-indigo-700/80 flex items-center justify-between gap-3 text-xs">
-                  <div className="truncate">
-                    <span className="text-zinc-400 block text-[10px] uppercase font-bold">Instant Login Token</span>
-                    <span className="font-mono text-indigo-200 font-bold">{sentCode}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => handleVerifyMagicCode(e)}
-                    disabled={isVerifyingMagic}
-                    className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-bold text-xs cursor-pointer transition-colors shadow shrink-0"
-                  >
-                    {isVerifyingMagic ? 'Signing In...' : 'Sign In Now →'}
-                  </button>
-                </div>
-              )}
-
               {/* Always visible verification input */}
               <div className="pt-3 border-t border-zinc-800/80 space-y-2">
                 <div className="flex items-center justify-between">
@@ -718,7 +692,7 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   >
                     Enter Magic Code or Token
                   </label>
-                  <span className="text-[11px] text-zinc-500">From email or mailbox</span>
+                  <span className="text-[11px] text-zinc-500">From your email inbox</span>
                 </div>
                 <form onSubmit={handleVerifyMagicCode} className="flex gap-2">
                   <input
