@@ -109,7 +109,7 @@ export class HttpClient {
     }
 
     this.baseURL = base;
-    this.timeoutMs = config?.timeoutMs ?? 5000;
+    this.timeoutMs = config?.timeoutMs ?? 20000;
     this.offlineCooldownMs = config?.offlineCooldownMs ?? 2000;
   }
 
@@ -200,7 +200,13 @@ export class HttpClient {
 
     const controller = new AbortController();
     const timeout = timeoutMs || this.timeoutMs;
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const timeoutId = setTimeout(() => {
+      try {
+        controller.abort(new Error(`Request timed out after ${timeout}ms`));
+      } catch {
+        controller.abort();
+      }
+    }, timeout);
 
     const reqHeaders: Record<string, string> = {
       Accept: 'application/json',
@@ -229,6 +235,11 @@ export class HttpClient {
         body: serializedBody,
         signal: controller.signal,
       });
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || controller.signal.aborted) {
+        throw new Error('Request timed out. Please check your internet connection and try again.');
+      }
+      throw err;
     } finally {
       clearTimeout(timeoutId);
     }

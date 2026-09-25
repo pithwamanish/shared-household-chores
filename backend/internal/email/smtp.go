@@ -74,13 +74,16 @@ func (s *SMTPService) sendViaSMTP(toEmail, toName, subject, textBody, htmlBody, 
 
 	msg.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
 
-	err := smtp.SendMail(addr, auth, fromAddr, []string{toEmail}, []byte(msg.String()))
-	if err != nil {
-		log.Printf("[EMAIL][SMTP] Delivery error to %s: %v", toEmail, err)
-		return fmt.Errorf("smtp send failed: %w", err)
-	}
+	rawMsg := []byte(msg.String())
+	go func() {
+		err := smtp.SendMail(addr, auth, fromAddr, []string{toEmail}, rawMsg)
+		if err != nil {
+			log.Printf("[EMAIL][SMTP] Delivery error to %s: %v", toEmail, err)
+			return
+		}
+		log.Printf("[EMAIL][SMTP] Successfully delivered email to %s via %s", toEmail, addr)
+	}()
 
-	log.Printf("[EMAIL][SMTP] Successfully delivered email to %s via %s", toEmail, addr)
 	return nil
 }
 
