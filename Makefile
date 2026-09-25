@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -138,6 +138,25 @@ oncall-verify:
 oncall-test:
 	@echo "Triggering test incident and alert ingest..."
 	@bash on-call-engineer/scripts/trigger-test-incident
+
+oncall-drill:
+	@echo "Executing Closed-Loop Intentional Fault Injection & Resilience Drill..."
+	@bash on-call-engineer/scripts/inject-fault 500-burst --run-drill
+
+oncall-evidence:
+	@echo "Collecting bounded read-only evidence packet..."
+	@bash on-call-engineer/scripts/collect-evidence
+
+oncall-policy-check:
+	@echo "Evaluating action against on-call autonomy policy..."
+	@bash on-call-engineer/scripts/authorize-action '{"action": "rollback", "rationale": "High 5xx rate detected"}'
+
+security-scan:
+	@echo "Running Deterministic Static Application Security Testing (Semgrep)..."
+	@bash security-audit/run-security-scan
+
+security-audit: security-scan oncall-verify
+	@echo "Deterministic security scan and operational resilience verification passed!"
 
 demo-record:
 	@echo "1. Pre-warming live observability data (Loki logs, Tempo traces, firing alerts)..."

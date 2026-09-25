@@ -1,0 +1,111 @@
+rules:
+  # Secrets detection for JavaScript & TypeScript
+  - id: hardcoded-secret-js-ts
+    patterns:
+      - pattern-either:
+          - pattern: const $SECRET = "..."
+          - pattern: let $SECRET = "..."
+          - pattern: var $SECRET = "..."
+      - metavariable-regex:
+          metavariable: $SECRET
+          regex: (?i)(api_key|secret_key|password|jwt_secret|private_key|token|access_key)
+      - pattern-not: const $SECRET = ""
+      - pattern-not: let $SECRET = ""
+      - pattern-not: var $SECRET = ""
+      - pattern-not: const $SECRET = "test"
+      - pattern-not: const $SECRET = "development"
+    message: "Potential hardcoded secret or credential detected in JS/TS. Use environment variables instead."
+    languages: [javascript, typescript]
+    severity: ERROR
+
+  # Secrets detection for Go
+  - id: hardcoded-secret-go
+    patterns:
+      - pattern-either:
+          - pattern: const $SECRET = "..."
+          - pattern: var $SECRET = "..."
+          - pattern: $SECRET := "..."
+      - metavariable-regex:
+          metavariable: $SECRET
+          regex: (?i)(api_key|secret_key|password|jwt_secret|private_key|token|access_key)
+      - pattern-not: const $SECRET = ""
+      - pattern-not: var $SECRET = ""
+      - pattern-not: $SECRET := ""
+      - pattern-not: const $SECRET = "test"
+      - pattern-not: $SECRET := "test"
+      - pattern-not: const $SECRET = "development"
+    message: "Potential hardcoded secret or credential detected in Go. Use environment variables instead."
+    languages: [go]
+    severity: ERROR
+
+  # Secrets detection for Python
+  - id: hardcoded-secret-python
+    patterns:
+      - pattern: $SECRET = "..."
+      - metavariable-regex:
+          metavariable: $SECRET
+          regex: (?i)(api_key|secret_key|password|jwt_secret|private_key|token|access_key)
+      - pattern-not: $SECRET = ""
+      - pattern-not: $SECRET = "test"
+      - pattern-not: $SECRET = "development"
+    message: "Potential hardcoded secret or credential detected in Python. Use environment variables instead."
+    languages: [python]
+    severity: ERROR
+
+  # SQL Injection for Python
+  - id: python-sql-injection
+    patterns:
+      - pattern-either:
+          - pattern: $DB.execute(f"...")
+          - pattern: $DB.query(f"...")
+          - pattern: cursor.execute(f"...")
+      - metavariable-regex:
+          metavariable: $DB
+          regex: (?i)(db|conn|cursor|session)
+    message: "Unescaped f-string interpolation in SQL query. Potential SQL injection. Use parameterized queries."
+    languages: [python]
+    severity: ERROR
+
+  # SQL Injection for JS/TS
+  - id: js-sql-injection
+    patterns:
+      - pattern-either:
+          - pattern: $DB.query(`... ${$PARAM} ...`)
+          - pattern: $DB.execute(`... ${$PARAM} ...`)
+          - pattern: $DB.raw(`... ${$PARAM} ...`)
+    message: "Unescaped template string interpolation in SQL query. Potential SQL injection. Use parameterized queries."
+    languages: [javascript, typescript]
+    severity: ERROR
+
+  # SQL Injection for Go
+  - id: go-sql-string-formatting
+    patterns:
+      - pattern-either:
+          - pattern: $DB.Query(fmt.Sprintf(...), ...)
+          - pattern: $DB.QueryRow(fmt.Sprintf(...), ...)
+          - pattern: $DB.Exec(fmt.Sprintf(...), ...)
+    message: "Potential SQL injection using fmt.Sprintf in database query. Use parameterized SQL ($1, $2, etc.)."
+    languages: [go]
+    severity: ERROR
+
+  # Shell Command Injection for Python
+  - id: python-unsafe-shell-execution
+    patterns:
+      - pattern-either:
+          - pattern: os.system($CMD)
+          - pattern: subprocess.Popen($CMD, ..., shell=True, ...)
+          - pattern: subprocess.call($CMD, ..., shell=True, ...)
+          - pattern: exec($CMD)
+    message: "Execution of unvalidated commands with shell=True or exec in Python. Potential command injection."
+    languages: [python]
+    severity: WARNING
+
+  # Shell Command Injection for JS/TS
+  - id: js-unsafe-shell-execution
+    patterns:
+      - pattern-either:
+          - pattern: child_process.exec($CMD, ...)
+          - pattern: exec($CMD, ...)
+    message: "Execution of unvalidated commands with exec in JS/TS. Potential command injection."
+    languages: [javascript, typescript]
+    severity: WARNING

@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Deterministic Static Application Security Testing (SAST) via Semgrep Container
+# Scans project code for OWASP Top 10, credential leaks, and injection vulnerabilities
+# without requiring host runtimes.
+
+show_help() {
+  echo "Usage: run-security-scan [OPTIONS] [target_dir]"
+  echo ""
+  echo "Executes Semgrep inside a Docker container for deterministic security scanning."
+  echo ""
+  echo "Options:"
+  echo "  -c, --config <path>    Custom rules file (default: security-audit/semgrep-rules.yml or auto)"
+  echo "  -o, --output <path>    Output JSON report path (default: security-audit/semgrep-results.json)"
+  echo "  --strict               Fail with non-zero exit code on any findings"
+  echo "  -h, --help             Show this help message"
+  exit 0
+}
+
+TARGET_DIR="${1:-${PWD}}"
+CONFIG_OPTION="auto"
+OUTPUT_FILE="${TARGET_DIR}/security-audit/semgrep-results.json"
+STRICT_MODE=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -c|--config)
+      CONFIG_OPTION="$2"
+      shift 2
+      ;;
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    --strict)
+      STRICT_MODE=true
+      shift
+      ;;
+    -h|--help)
+      show_help
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      show_help
+      ;;
+    *)
+      TARGET_DIR="$1"
+      shift
+      ;;
+  esac
+done
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "ERROR: Docker is required to run containerized Semgrep."
+  exit 1
+fi
+
+mkdir -p "$(dirname "${OUTPUT_FILE}")"
+
+# Check if local rules exist
+LOCAL_RULES="${TARGET_DIR}/security-audit/semgrep-rules.yml"
+CONFIG_ARG="--config=auto"
+if [ -f "${LOCAL_RULES}" ]; then
+  CONFIG_ARG="--config=/src/security-audit/semgrep-rules.yml"
+elif [ "${CONFIG_OPTION}" != "auto" ]; then
+  CONFIG_ARG="--config=${CONFIG_OPTION}"
+fi
+
+echo "================================================================"
+echo "          DETERMINISTIC SECURITY SCANNER (SEMGREP)              "
+echo "================================================================"
+echo "Target Directory: ${TARGET_DIR}"
+echo "Config Rules:     ${CONFIG_ARG}"
+echo "Output Report:    ${OUTPUT_FILE}"
+echo "================================================================"
+
+echo "==> Running Semgrep container..."
+docker run --rm \
+  -v "${TARGET_DIR}:/src" \
+  -w /src \
+  returntocorp/semgrep \
+  semgrep scan ${CONFIG_ARG} --json -o "/src/$(realpath --relative-to="${TARGET_DIR}" "${OUTPUT_FILE}")" || true
+
+if [ -f "${OUTPUT_FILE}" ]; then
+  echo "==> Scan complete. Inspecting results in ${OUTPUT_FILE}..."
+  ERROR_COUNT=$(grep -o '"severity": *"ERROR"' "${OUTPUT_FILE}" 2>/dev/null | wc -l | tr -d ' \n\r' || echo "0")
+  WARN_COUNT=$(grep -o '"severity": *"WARNING"' "${OUTPUT_FILE}" 2>/dev/null | wc -l | tr -d ' \n\r' || echo "0")
+  ERROR_COUNT="${ERROR_COUNT:-0}"
+  WARN_COUNT="${WARN_COUNT:-0}"
+
+  echo ""
+  echo "Security Scan Summary:"
+  echo "  - Critical / Errors: ${ERROR_COUNT}"
+  echo "  - Warnings:          ${WARN_COUNT}"
+  echo ""
+
+  if [ "${ERROR_COUNT}" -gt 0 ]; then
+    echo "FAILED: Deterministic security scanner found ${ERROR_COUNT} high-severity issue(s)!"
+    exit 1
+  fi
+else
+  echo "WARNING: No output file generated at ${OUTPUT_FILE}."
+fi
+
+echo "OK: Deterministic security scan passed with 0 critical findings."

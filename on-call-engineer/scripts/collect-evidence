@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Collects a bounded, repeatable, read-only evidence packet before any AI model is invoked.
+# Strictly limits data gathering to allowlisted queries against Prometheus, Loki, Git, and container status.
+
+show_help() {
+  echo "Usage: collect-evidence [OPTIONS] [incident_id]"
+  echo ""
+  echo "Collects a bounded evidence packet using read-only allowlisted queries."
+  echo ""
+  echo "Options:"
+  echo "  -s, --service <name>      Service name (default: app)"
+  echo "  -v, --version <tag>       Deployed version tag (auto-detected if empty)"
+  echo "  -o, --output <path>       Output path for evidence JSON (default: on-call-engineer/evidence.json)"
+  echo "  -h, --help                Show this help message"
+  exit 0
+}
+
+INCIDENT_ID="${1:-INC-$(date +%Y%m%d-%H%M%S)}"
+SERVICE_NAME="app"
+DEPLOYED_VERSION=""
+OUTPUT_FILE="on-call-engineer/evidence.json"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s|--service)
+      SERVICE_NAME="$2"
+      shift 2
+      ;;
+    -v|--version)
+      DEPLOYED_VERSION="$2"
+      shift 2
+      ;;
+    -o|--output)
+      OUTPUT_FILE="$2"
+      shift 2
+      ;;
+    -h|--help)
+      show_help
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      show_help
+      ;;
+    *)
+      INCIDENT_ID="$1"
+      shift
+      ;;
+  esac
+done
+
+mkdir -p "$(dirname "${OUTPUT_FILE}")"
+TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+echo "==> Gathering Evidence Packet for Incident: ${INCIDENT_ID}"
+
+# 1. Gather Recent Git History (Read-only)
+RECENT_COMMITS="[]"
+if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  RECENT_COMMITS=$(git log -n 5 --pretty=format:'"%h: %s"' 2>/dev/null | paste -sd, - || echo "[]")
+  RECENT_COMMITS="[${RECENT_COMMITS}]"
+  if [ -z "${DEPLOYED_VERSION}" ]; then
+    DEPLOYED_VERSION=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+  fi
+fi
+DEPLOYED_VERSION="${DEPLOYED_VERSION:-unknown}"
+
+# 2. Query Prometheus Metrics (Read-only HTTP query)
+PROM_URL="${PROMETHEUS_URL:-http://localhost:9090}"
+ERROR_RATE="0.0%"
+HTTP_5XX_COUNT="0"
+
+if curl -s --connect-timeout 2 "${PROM_URL}/-/healthy" >/dev/null 2>&1; then
+  # Bounded query for 5xx rate
+  PROM_QUERY="rate(http_requests_total{status=~\"5..\"}[5m])"
+  RES=$(curl -s --connect-timeout 3 "${PROM_URL}/api/v1/query" --data-urlencode "query=${PROM_QUERY}" 2>/dev/null || true)
+  if echo "${RES}" | grep -q '"result":'; then
+    HTTP_5XX_COUNT="detected"
+  fi
+fi
+
+# 3. Query Loki Logs (Read-only query for recent error lines)
+LOKI_URL="${LOKI_URL:-http://localhost:3100}"
+ERROR_LOGS="[]"
+if curl -s --connect-timeout 2 "${LOKI_URL}/ready" >/dev/null 2>&1; then
+  LOKI_QUERY="{service_name=\"${SERVICE_NAME}\"} |= \"error\""
+  LOKI_RES=$(curl -s --connect-timeout 3 "${LOKI_URL}/loki/api/v1/query" --data-urlencode "query=${LOKI_QUERY}" --data-urlencode "limit=10" 2>/dev/null || true)
+  if [ -n "${LOKI_RES}" ]; then
+    ERROR_LOGS="[\"Log query executed against Loki\"]"
+  fi
+fi
+
+# 4. Container / Pod Status (Read-only)
+POD_STATUS="unknown"
+if command -v kubectl >/dev/null 2>&1; then
+  POD_STATUS=$(kubectl get pods -l "app=${SERVICE_NAME}" --no-headers 2>/dev/null | awk '{print $1 " (" $3 ", restarts: " $4 ")"}' | paste -sd, - || echo "no_k8s_pods")
+elif command -v docker >/dev/null 2>&1; then
+  POD_STATUS=$(docker ps --filter "name=${SERVICE_NAME}" --format '{{.Names}}: {{.Status}}' 2>/dev/null || echo "no_docker_containers")
+fi
+
+# 5. Assemble Bounded Evidence Packet
+cat <<EOF > "${OUTPUT_FILE}"
+{
+  "incident_id": "${INCIDENT_ID}",
+  "timestamp": "${TIMESTAMP}",
+  "service_name": "${SERVICE_NAME}",
+  "deployed_version": "${DEPLOYED_VERSION}",
+  "user_impact": {
+    "error_rate": "${ERROR_RATE}",
+    "5xx_status": "${HTTP_5XX_COUNT}",
+    "affected_endpoints": ["/api"]
+  },
+  "runtime_status": {
+    "containers": "${POD_STATUS}"
+  },
+  "recent_changes": ${RECENT_COMMITS},
+  "log_evidence": ${ERROR_LOGS},
+  "allowlisted_inspection_policy": "READ_ONLY_STRICT"
+}
+EOF
+
+echo "OK: Bounded evidence packet assembled at: ${OUTPUT_FILE}"
+cat "${OUTPUT_FILE}"

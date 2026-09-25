@@ -1,0 +1,17 @@
+{
+  "incident_id": "DRILL-20260925-130241",
+  "timestamp": "2026-09-25T07:32:41Z",
+  "service_name": "app",
+  "deployed_version": "4d1f148",
+  "user_impact": {
+    "error_rate": "0.0%",
+    "5xx_status": "detected",
+    "affected_endpoints": ["/api"]
+  },
+  "runtime_status": {
+    "containers": ""
+  },
+  "recent_changes": ["4d1f148: feat(eval): formalize Gate 14 Agent Extension Pack Conformance Evaluation (100% COMPLIANT)","51d228a: feat(agent): implement Gate 13 Agent Extension Pack adhering to open standard","97bea1e: feat(ci): implement Gate 11 local CI/CD pipeline with act and kind rollout verification","953a122: feat(cloud): integrate Floci local cloud emulator with S3 photo storage and SQS nudge worker","94dd0d7: feat(k8s): implement Gate 10 local Kubernetes deployment with kind, PVC storage, and automated verification"],
+  "log_evidence": ["Log query executed against Loki"],
+  "allowlisted_inspection_policy": "READ_ONLY_STRICT"
+}

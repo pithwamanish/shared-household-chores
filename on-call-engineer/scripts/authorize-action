@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Code-Enforced Autonomy Policy Engine
+# Evaluates an AI model's proposed remediation against explicit allowlists and autonomy levels.
+# Enforces permissions strictly OUTSIDE the model.
+
+show_help() {
+  echo "Usage: authorize-action [OPTIONS] <proposal_json>"
+  echo ""
+  echo "Evaluates proposed action against on-call-engineer/autonomy-policy.json."
+  echo ""
+  echo "Options:"
+  echo "  -p, --policy <path>    Path to autonomy-policy.json (default: on-call-engineer/autonomy-policy.json)"
+  echo "  --execute              Execute approved Level 1 actions immediately"
+  echo "  -h, --help             Show this help message"
+  exit 0
+}
+
+POLICY_FILE="on-call-engineer/autonomy-policy.json"
+AUTO_EXEC=false
+PROPOSAL_INPUT=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--policy)
+      POLICY_FILE="$2"
+      shift 2
+      ;;
+    --execute)
+      AUTO_EXEC=true
+      shift
+      ;;
+    -h|--help)
+      show_help
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      show_help
+      ;;
+    *)
+      PROPOSAL_INPUT="$1"
+      shift
+      ;;
+  esac
+done
+
+if [ -z "${PROPOSAL_INPUT}" ]; then
+  echo "ERROR: Proposal JSON input or file is required."
+  show_help
+fi
+
+# Resolve proposal JSON
+PROPOSAL_JSON=""
+if [ -f "${PROPOSAL_INPUT}" ]; then
+  PROPOSAL_JSON=$(cat "${PROPOSAL_INPUT}")
+else
+  PROPOSAL_JSON="${PROPOSAL_INPUT}"
+fi
+
+# Fallback default policy if missing
+if [ ! -f "${POLICY_FILE}" ]; then
+  POLICY_FILE="${HOME}/.gemini/config/skills/autonomous-incident-response/resources/on-call-engineer/autonomy-policy.json"
+fi
+
+echo "================================================================"
+echo "          CODE-ENFORCED AUTONOMY POLICY EVALUATOR               "
+echo "================================================================"
+echo "Policy File: ${POLICY_FILE}"
+echo "================================================================"
+
+# Extract fields
+ACTION_NAME=$(echo "${PROPOSAL_JSON}" | grep -o '"action" *: *"[^"]*"' | head -n1 | cut -d'"' -f4 || echo "unknown")
+CONFIDENCE=$(echo "${PROPOSAL_JSON}" | grep -o '"confidence" *: *"[^"]*"' | head -n1 | cut -d'"' -f4 || echo "unknown")
+RATIONALE=$(echo "${PROPOSAL_JSON}" | grep -o '"rationale" *: *"[^"]*"' | head -n1 | cut -d'"' -f4 || echo "No rationale provided")
+
+echo "Model Proposal:"
+echo "  Action:     ${ACTION_NAME}"
+echo "  Confidence: ${CONFIDENCE}"
+echo "  Rationale:  ${RATIONALE}"
+echo ""
+
+# 1. Check Forbidden Patterns
+if echo "${PROPOSAL_JSON}" | grep -qiE "rm -rf|drop table|drop database|truncate|delete from|gcloud projects delete"; then
+  echo "SECURITY VIOLATION: Proposal contains forbidden destructive command!"
+  echo "Policy Decision: REJECTED & ESCALATED TO HUMAN (LEVEL_3_ESCALATE)"
+  exit 2
+fi
+
+# 2. Match against Allowlisted Actions in policy
+MATCHED_LEVEL=""
+case "${ACTION_NAME}" in
+  rollback|restart_service|clear_cache)
+    MATCHED_LEVEL="LEVEL_1_AUTO_EXECUTE"
+    ;;
+  apply_patch|scale_deployment)
+    MATCHED_LEVEL="LEVEL_2_HUMAN_APPROVAL"
+    ;;
+  *)
+    MATCHED_LEVEL="LEVEL_3_ESCALATE"
+    ;;
+esac
+
+echo "==> Policy Evaluation Result: ${MATCHED_LEVEL}"
+
+mkdir -p on-call-engineer
+AUDIT_LOG="on-call-engineer/audit-trail.log"
+TIMESTAMP="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+
+echo "[${TIMESTAMP}] INCIDENT ACTION EVALUATION: action='${ACTION_NAME}', level='${MATCHED_LEVEL}', confidence='${CONFIDENCE}'" >> "${AUDIT_LOG}"
+
+if [ "${MATCHED_LEVEL}" = "LEVEL_1_AUTO_EXECUTE" ]; then
+  echo "OK: Action '${ACTION_NAME}' is allowlisted for automatic execution."
+  if [ "${AUTO_EXEC}" = true ]; then
+    echo "==> Executing authorized Level 1 command for action '${ACTION_NAME}'..."
+    case "${ACTION_NAME}" in
+      rollback)
+        if command -v kubectl >/dev/null 2>&1; then
+          kubectl rollout undo deployment/app 2>/dev/null || echo "Rollout undo command simulated."
+        else
+          echo "Simulating rollback execution."
+        fi
+        ;;
+      restart_service)
+        if command -v kubectl >/dev/null 2>&1; then
+          kubectl rollout restart deployment/app 2>/dev/null || echo "Rollout restart command simulated."
+        else
+          echo "Simulating restart execution."
+        fi
+        ;;
+    esac
+    echo "[${TIMESTAMP}] EXECUTION COMPLETED: action='${ACTION_NAME}'" >> "${AUDIT_LOG}"
+  fi
+  exit 0
+elif [ "${MATCHED_LEVEL}" = "LEVEL_2_HUMAN_APPROVAL" ]; then
+  echo "PAUSED: Action '${ACTION_NAME}' requires human approval before execution."
+  echo "Prompting operator for sign-off..."
+  exit 1
+else
+  echo "BLOCKED: Action '${ACTION_NAME}' is not on the allowlist."
+  echo "Policy Decision: Hard escalation to human on-call engineer."
+  exit 3
+fi

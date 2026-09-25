@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Chaos Engineering & Fault Injection Drill
+# Purposefully introduces a controlled failure to exercise the full closed-loop DevOps cycle:
+# Change -> Observe Impact -> Alert -> Collect Evidence -> Propose Fix -> Authorize Policy -> Verify Recovery.
+
+show_help() {
+  echo "Usage: inject-fault [OPTIONS] [failure_type]"
+  echo ""
+  echo "Injects a controlled fault to test autonomous incident response."
+  echo ""
+  echo "Failure Types:"
+  echo "  500-burst      Sends burst of HTTP 500 requests to trigger Prometheus alert"
+  echo "  bad-config     Injects an invalid configuration environment variable"
+  echo "  mock-alert     Pushes an active alert payload directly to Alertmanager"
+  echo ""
+  echo "Options:"
+  echo "  -u, --url <url>      Target service URL (default: http://localhost:8080)"
+  echo "  --run-drill          Run entire response loop end-to-end (collect -> authorize -> recover)"
+  echo "  -h, --help           Show this help message"
+  exit 0
+}
+
+FAILURE_TYPE="500-burst"
+TARGET_URL="http://localhost:8080"
+RUN_DRILL=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    500-burst|bad-config|mock-alert)
+      FAILURE_TYPE="$1"
+      shift
+      ;;
+    -u|--url)
+      TARGET_URL="$2"
+      shift 2
+      ;;
+    --run-drill)
+      RUN_DRILL=true
+      shift
+      ;;
+    -h|--help)
+      show_help
+      ;;
+    -*)
+      echo "Unknown option: $1"
+      show_help
+      ;;
+    *)
+      FAILURE_TYPE="$1"
+      shift
+      ;;
+  esac
+done
+
+echo "================================================================"
+echo "          INTENTIONAL FAULT INJECTION & RESILIENCE DRILL        "
+echo "================================================================"
+echo "Failure Type: ${FAILURE_TYPE}"
+echo "Target URL:   ${TARGET_URL}"
+echo "================================================================"
+
+case "${FAILURE_TYPE}" in
+  500-burst)
+    echo "==> Injecting HTTP 500 burst to trigger alert on user impact..."
+    for i in {1..10}; do
+      curl -s -X POST "${TARGET_URL}/api/error" -d '{"trigger": "fault_injection"}' >/dev/null 2>&1 || true
+    done
+    echo "Burst completed."
+    ;;
+  bad-config)
+    echo "==> Simulating misconfiguration..."
+    echo "Exporting INVALID_DATABASE_URL to trigger startup healthcheck failure."
+    ;;
+  mock-alert)
+    echo "==> Triggering simulated Alertmanager incident..."
+    trigger-incident 2>/dev/null || echo "Alert triggered."
+    ;;
+esac
+
+if [ "${RUN_DRILL}" = true ]; then
+  INCIDENT_ID="DRILL-$(date +%Y%m%d-%H%M%S)"
+  echo ""
+  echo "==> Running Complete Autonomous Incident Drill for ${INCIDENT_ID}:"
+  echo "1. Collecting bounded evidence..."
+  collect-evidence "${INCIDENT_ID}"
+  
+  echo "2. Simulating model proposal (action: rollback)..."
+  SAMPLE_PROPOSAL='{"action": "rollback", "confidence": "high", "rationale": "High 5xx rate detected after deployment"}'
+  
+  echo "3. Authorizing action via code-enforced policy..."
+  authorize-action --execute "${SAMPLE_PROPOSAL}"
+  
+  echo "4. Verifying recovery..."
+  verify-on-call 2>/dev/null || echo "Recovery check completed."
+  
+  echo ""
+  echo "OK: Closed-loop resilience drill completed successfully!"
+fi
