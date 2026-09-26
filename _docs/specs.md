@@ -218,6 +218,16 @@ erDiagram
 - `POST /api/chores/{chore_id}/comments`: Post a comment on a chore discussion thread.
 - `GET /api/households/{id}/activity`: Retrieve timeline of recent household chore activity and milestones.
 
+### 4.6 Authentication, Magic Links & Multi-Tenancy Operations
+- `POST /api/auth/register`: Register new household administrator with credentials.
+- `POST /api/auth/login`: Authenticate existing member with email and password.
+- `POST /api/auth/magic-link`: Request 1-click passwordless magic login link.
+- `GET /api/auth/verify`: Validate magic login token and generate authenticated JWT claims.
+- `POST /api/auth/forgot-password`: Request password reset email token.
+- `POST /api/auth/reset-password`: Set new password using 1-hour reset token.
+- `POST /api/auth/supabase-login`: Exchange verified Supabase Auth JWT access token for ChoreSync session claims and auto-provision user profile.
+- `POST /api/auth/demo-login`: Quick-switch persona login for local evaluation and shared tablet testing.
+
 ---
 
 ## 5. Non-Functional Requirements

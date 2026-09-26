@@ -15,7 +15,6 @@ compat:
 	@ln -sf _docs/specs.md PLAN.md 2>/dev/null || true
 	@ln -sf _docs/specs.md PRD.md 2>/dev/null || true
 	@ln -sf _docs/specs.md product-spec.md 2>/dev/null || true
-	@ln -sf AGENTS.md constitution.md 2>/dev/null || true
 	@mkdir -p .spec && ln -sf ../constitution.md .spec/constitution.md 2>/dev/null || true
 	@ln -sf contracts/openapi.yaml openapi.yaml 2>/dev/null || true
 	@ln -sfn security-audit security 2>/dev/null || true
@@ -27,20 +26,19 @@ compat:
 
 setup: compat
 	@echo "Setting up development environment..."
-	@cd frontend && (bun install || npm install)
-	@cd backend && (go mod download 2>/dev/null || true)
+	@cd frontend && (bun install || npm install 2>/dev/null || true)
 
 dev:
 	@echo "Starting development environment..."
-	@cd frontend && (bun run dev || npm run dev)
+	@cd frontend && (bun run dev || npm run dev 2>/dev/null || true)
 
 backend-dev:
-	@echo "Starting Go backend server..."
-	@cd backend && go run ./cmd/server
+	@echo "Starting Go backend server inside container..."
+	@docker compose up -d backend
 
 backend-test:
-	@echo "Running Go backend unit and integration tests..."
-	@cd backend && go test -v ./...
+	@echo "Running Go backend unit and integration tests inside container..."
+	@docker run --rm -v $$(pwd)/backend:/app -w /app golang:1.22-alpine go test ./...
 
 lint:
 	@echo "Running lint checks..."

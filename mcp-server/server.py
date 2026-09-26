@@ -211,6 +211,39 @@ def tool_inspect_cloud_emulator(args):
   }
 
 
+def tool_inspect_chore_operations(args):
+  household_filter = args.get("household_id")
+  archetype = args.get("archetype")
+  backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+  live_data = None
+
+  try:
+    req = urllib.request.Request(f"{backend_url}/api/v1/chores")
+    with urllib.request.urlopen(req, timeout=1.5) as resp:
+      if resp.status == 200:
+        live_data = json.loads(resp.read().decode("utf-8"))
+  except Exception:
+    pass
+
+  return {
+      "status": "success",
+      "queried_live_backend": live_data is not None,
+      "supported_archetypes": ["flatmates", "families", "couples"],
+      "filters": {
+          "household_id": household_filter or "all",
+          "archetype": archetype or "all",
+      },
+      "domain_rules": {
+          "rotation": "round_robin auto-advances to next member upon chore completion",
+          "approval_gate": "requires_approval shifts chore to pending_approval state",
+          "photo_proof": "S3 multipart upload to choresync-proofs",
+          "async_reminders": "SQS message queuing to choresync-reminders",
+          "gamification": "points_balance >= 0 non-negative invariant",
+      },
+      "chores": live_data,
+  }
+
+
 def main():
   while True:
     try:
@@ -301,6 +334,26 @@ def main():
                         ),
                         "inputSchema": {"type": "object", "properties": {}},
                     },
+                    {
+                        "name": "inspect_chore_operations",
+                        "description": (
+                            "Inspects ChoreSync domain operations, supported"
+                            " archetypes, approval gates, and active chores"
+                        ),
+                        "inputSchema": {
+                            "type": "object",
+                            "properties": {
+                                "household_id": {
+                                    "type": "string",
+                                    "description": "Optional household ID",
+                                },
+                                "archetype": {
+                                    "type": "string",
+                                    "description": "Optional archetype filter (flatmates, families, couples)",
+                                },
+                            },
+                        },
+                    },
                 ]
             },
         })
@@ -315,6 +368,8 @@ def main():
           res = tool_inspect_db_schema(arguments)
         elif tool_name == "inspect_cloud_emulator":
           res = tool_inspect_cloud_emulator(arguments)
+        elif tool_name == "inspect_chore_operations":
+          res = tool_inspect_chore_operations(arguments)
         else:
           res = {"error": f"Unknown tool: {tool_name}"}
 

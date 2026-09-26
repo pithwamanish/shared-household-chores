@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -1604,10 +1605,34 @@ func (p *PostgresStore) CreateMagicLink(email string) (string, *models.Member, *
 	return token, mem, hh, nil
 }
 
+type verifiedMagicLinkCacheEntry struct {
+	member    *models.Member
+	household *models.Household
+	cachedAt  time.Time
+}
+
+var (
+	recentVerifiedTokensMu sync.RWMutex
+	recentVerifiedTokens   = make(map[string]verifiedMagicLinkCacheEntry)
+)
+
 func (p *PostgresStore) VerifyMagicLink(token string) (*models.Member, *models.Household, error) {
 	ctx := context.Background()
 	cleanToken := strings.TrimSpace(token)
 	upperToken := strings.ToUpper(cleanToken)
+
+	// 0. Idempotent short-lived cache check (30 seconds):
+	// Protects against React StrictMode double invocation, component remounts, or browser double-clicks
+	recentVerifiedTokensMu.RLock()
+	if entry, ok := recentVerifiedTokens[cleanToken]; ok && time.Since(entry.cachedAt) < 30*time.Second {
+		recentVerifiedTokensMu.RUnlock()
+		return entry.member, entry.household, nil
+	}
+	if entry, ok := recentVerifiedTokens[upperToken]; ok && time.Since(entry.cachedAt) < 30*time.Second {
+		recentVerifiedTokensMu.RUnlock()
+		return entry.member, entry.household, nil
+	}
+	recentVerifiedTokensMu.RUnlock()
 
 	var actualToken string
 	var memberID string
@@ -1663,6 +1688,26 @@ func (p *PostgresStore) VerifyMagicLink(token string) (*models.Member, *models.H
 	if err != nil {
 		return nil, nil, ErrNotFound
 	}
+
+	// Record in short-lived memory cache so concurrent requests within 30s succeed
+	recentVerifiedTokensMu.Lock()
+	recentVerifiedTokens[cleanToken] = verifiedMagicLinkCacheEntry{
+		member:    mem,
+		household: hh,
+		cachedAt:  time.Now(),
+	}
+	recentVerifiedTokens[upperToken] = verifiedMagicLinkCacheEntry{
+		member:    mem,
+		household: hh,
+		cachedAt:  time.Now(),
+	}
+	// Prune older than 2 minutes
+	for k, v := range recentVerifiedTokens {
+		if time.Since(v.cachedAt) > 2*time.Minute {
+			delete(recentVerifiedTokens, k)
+		}
+	}
+	recentVerifiedTokensMu.Unlock()
 
 	return mem, hh, nil
 }
@@ -1947,4 +1992,18 @@ func (p *PostgresStore) ResetPasswordWithToken(token, newPassword string) (*mode
 
 	return mem, hh, nil
 }
+
+// UpdatePassword updates a member's password hash in PostgreSQL.
+func (p *PostgresStore) UpdatePassword(memberID, password string) error {
+	ctx := context.Background()
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	now := time.Now().UTC()
+	_, err = p.pool.Exec(ctx, `UPDATE members SET password_hash = $1, updated_at = $2 WHERE id = $3`, string(hash), now, memberID)
+	return err
+}
+
 

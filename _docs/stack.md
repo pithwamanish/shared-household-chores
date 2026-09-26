@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary & Context
 
-ChoreSync requires a reliable, lightweight backend service implementing the 26 endpoints and 46 data schemas defined in [`contracts/openapi.yaml`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/contracts/openapi.yaml). The frontend is built with **React 19 + TypeScript + Vite**. 
+ChoreSync requires a reliable, lightweight backend service implementing the 26 endpoints and 46 data schemas defined in [`contracts/openapi.yaml`](contracts/openapi.yaml). The frontend is built with **React 19 + TypeScript + Vite**. 
 
 Per the user's architectural selection in Step 6, the backend will be implemented in **Golang**. Go offers superior performance characteristics for free-tier cloud environments: ultra-low RAM footprint (~15–25MB vs ~100MB+ in Node/Python), near-instant cold boot (<50ms), and compact multi-stage Docker images (~20MB).
 
@@ -35,13 +35,13 @@ Per the user's architectural selection in Step 6, the backend will be implemente
 * **Why Chi**:
   - 100% compliant with standard library `net/http.Handler`.
   - Zero external dependency bloat; extremely lightweight and fast.
-  - Native integration with `oapi-codegen` to generate strictly-typed Go server interfaces and request/response models directly from [`contracts/openapi.yaml`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/contracts/openapi.yaml).
+  - Native integration with `oapi-codegen` to generate strictly-typed Go server interfaces and request/response models directly from [`contracts/openapi.yaml`](contracts/openapi.yaml).
   - Robust standard middleware ecosystem (Logger, Recoverer, CORS, RequestID, Timeout).
 
 ### Persistence & Data Layer Strategy
 1. **Step 7 (Scaffold & Test Harness)**:
    - **In-Memory Store**: Thread-safe in-memory repository implementing domain storage interfaces using Go structs with `sync.RWMutex`.
-   - Complete support for all 26 endpoints with seed test fixtures matching [`_docs/manual-test.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/_docs/manual-test.md).
+   - Complete support for all 26 endpoints with seed test fixtures matching [`_docs/manual-test.md`](_docs/manual-test.md).
    - Instant unit test execution (<0.2s for entire test suite via `go test ./...`).
 2. **Production Deployment**:
    - **`sqlc` + `pgx/v5`**: Compile-time type-safe SQL query generation for **Neon Serverless Postgres** (or pure Go `modernc.org/sqlite` without CGO).

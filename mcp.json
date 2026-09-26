@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "choresync-tools": {
+      "type": "stdio",
+      "command": "python3",
+      "args": ["mcp-server/server.py"],
+      "env": {
+        "CHORESYNC_ENV": "development",
+        "FLOCI_ENDPOINT": "http://localhost:4566",
+        "BACKEND_URL": "http://localhost:8000"
+      },
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

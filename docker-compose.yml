@@ -54,6 +54,18 @@ services:
       - S3_BUCKET_NAME=choresync-proofs
       - SQS_QUEUE_NAME=choresync-reminders
       - ENABLE_CLOUD_SERVICES=true
+      - EMAIL_PROVIDER=${EMAIL_PROVIDER:-}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASS=${SMTP_PASS:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:3000}
+      - SUPABASE_URL=${SUPABASE_URL:-}
+      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-}
     networks:
       - default
       - observability-net
@@ -79,6 +91,8 @@ services:
       - VITE_APP_ENV=development
       - VITE_APP_VERSION=dev-latest
       - VITE_OTEL_EXPORTER_URL=http://localhost:4318/v1/traces
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-${SUPABASE_URL:-}}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY:-}}
     depends_on:
       - backend
     restart: unless-stopped

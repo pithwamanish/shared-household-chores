@@ -98,6 +98,7 @@ func NewRouter(s store.Store, em email.Service, storage cloud.StorageService, qu
 		api.Post("/auth/demo-login", authH.DemoLogin)
 		api.Post("/auth/forgot-password", authH.RequestPasswordReset)
 		api.Post("/auth/reset-password", authH.ResetPassword)
+		api.Post("/auth/supabase-login", authH.SupabaseLogin)
 
 		// Dev email inspection (for testing and local verification)
 		api.Get("/dev/emails", authH.GetDevEmails)

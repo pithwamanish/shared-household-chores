@@ -10,7 +10,7 @@ ChoreSync was built using the **AI-Native Spec-Driven Development Methodology**,
 
 Rather than relying on uncontrolled prompt-and-pray generation, the system advanced through **16 Socratic Decision Gates**:
 - Requirements were elicited and frozen into functional domain specifications before selecting any tech stack.
-- The API contract ([`contracts/openapi.yaml`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/contracts/openapi.yaml)) was reverse-engineered and frozen before backend implementation.
+- The API contract ([`contracts/openapi.yaml`](contracts/openapi.yaml)) was reverse-engineered and frozen before backend implementation.
 - Every architectural choice (cloud hosting, database persistence, observability stack, local cloud emulator) was evaluated with trade-off matrices and confirmed at dedicated decision gates.
 - Code was verified using containerized tests, deterministic SAST, living contract drift detection, mutation testing, and continuous agent evaluations.
 
@@ -22,10 +22,10 @@ Rather than relying on uncontrolled prompt-and-pray generation, the system advan
 |---|---|---|
 | **Antigravity / Gemini CLI** | Architectural orchestration, Socratic gate transitions, container orchestration, Kubernetes manifests, and evaluation gates. | Meta-environment terminal agent with system prompt guardrails. |
 | **Claude Code** | High-precision backend Go and React TypeScript coding, refactoring, and test authoring. | Terminal CLI operating through **RTK (Rust Token Killer)** token proxy (60–90% token reduction). |
-| **Cursor & Windsurf** | Component styling, interactive tablet mode UI, and rapid frontend iteration. | Agentic IDE linked directly to [`AGENTS.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/AGENTS.md) via `.cursorrules` and `.windsurfrules`. |
-| **BMAD Agile Squad** | Specialized agent personas defined in [`.bmad/`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/.bmad/): Product Manager (`pm.md`), System Architect (`architect.md`), Lead Developer (`developer.md`), QA Engineer (`qa.md`), and Scrum Master (`scrum-master.md`). | Context-isolated subagent personas with defined boundaries. |
-| **Domain Specialist** | Domain expert subagent defined in [`custom-agent/specialist.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/custom-agent/specialist.md) enforcing living arrangement rules across Flatmates, Families, and Couples. | Specialist subagent with domain-bounded tools. |
-| **ChoreSync MCP Server** | Model Context Protocol server exposing 5 tools for cluster health, database schema inspection, contract verification, and chore lifecycle operations. | Zero-dependency Python 3 `stdio` server ([`mcp-server/server.py`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/mcp-server/server.py)) configured in [`mcp.json`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/mcp.json). |
+| **Cursor & Windsurf** | Component styling, interactive tablet mode UI, and rapid frontend iteration. | Agentic IDE linked directly to [`AGENTS.md`](AGENTS.md) via `.cursorrules` and `.windsurfrules`. |
+| **BMAD Agile Squad** | Specialized agent personas defined in [`.bmad/`](.bmad/): Product Manager (`pm.md`), System Architect (`architect.md`), Lead Developer (`developer.md`), QA Engineer (`qa.md`), and Scrum Master (`scrum-master.md`). | Context-isolated subagent personas with defined boundaries. |
+| **Domain Specialist** | Domain expert subagent defined in [`custom-agent/specialist.md`](custom-agent/specialist.md) enforcing living arrangement rules across Flatmates, Families, and Couples. | Specialist subagent with domain-bounded tools. |
+| **ChoreSync MCP Server** | Model Context Protocol server exposing 5 tools for cluster health, database schema inspection, contract verification, and chore lifecycle operations. | Zero-dependency Python 3 `stdio` server ([`mcp-server/server.py`](mcp-server/server.py)) configured in [`mcp.json`](mcp.json). |
 
 ---
 
@@ -35,8 +35,8 @@ Rather than relying on uncontrolled prompt-and-pray generation, the system advan
 Monolithic prompts (e.g. *"build a full household chore app"*) were strictly prohibited. Work was partitioned into isolated, verifiable milestones:
 
 1. **Gate 1 (Requirements Discovery)**: Functional requirements only; zero tech stack discussion.
-2. **Gate 2 & 3 (UI Prototype & Validation Journey)**: Scaffolded UI mock and 6-step manual test journey ([`_docs/manual-test.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/_docs/manual-test.md)).
-3. **Gate 5 (Contract Freeze)**: Generated [`contracts/openapi.yaml`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/contracts/openapi.yaml) (26 endpoints, 46 schemas) before backend implementation.
+2. **Gate 2 & 3 (UI Prototype & Validation Journey)**: Scaffolded UI mock and 6-step manual test journey ([`_docs/manual-test.md`](_docs/manual-test.md)).
+3. **Gate 5 (Contract Freeze)**: Generated [`contracts/openapi.yaml`](contracts/openapi.yaml) (26 endpoints, 46 schemas) before backend implementation.
 4. **Gate 6 (Tech Stack & Cloud Emulator)**: Evaluated Render, Fly.io, Koyeb, Supabase, Neon, Floci, and MinIO. Selected Go + Chi + `sqlc` + PostgreSQL on Neon, with **Floci** (`floci/floci:latest`) as local S3/SQS emulator.
 5. **Gate 7–11 (Implementation, CI/CD, Observability, Kubernetes)**: Multi-agent tasks executed in isolated git worktrees (`feat/task-<ID>`).
 6. **Gate 12–15 (Security, Extension Pack, Quality Reinforcement)**: Semgrep SAST, Agent Plugins 1.0 packaging, mutation testing, and continuous eval harness.
@@ -63,12 +63,12 @@ To prevent architectural drift and hallucinations, every AI interaction was anch
 
 | Context File | Purpose & Role |
 |---|---|
-| [`product-spec.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/product-spec.md) *(bridged to `_docs/specs.md`)* | Canonical source of truth for personas, entities (Household, Member, Chore, Swap, Reward), business logic, and anti-goals. |
-| [`constitution.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/constitution.md) *(bridged to `AGENTS.md`)* | Project supreme law declaring negative invariants, boundary rules, zero-host execution mandate, and decision gate sequencing. |
-| [`contracts/openapi.yaml`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/contracts/openapi.yaml) *(bridged to `openapi.yaml`)* | Frozen API contract. Neither frontend nor backend agents could modify this file unilaterally. |
-| [`docs/permissions.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/docs/permissions.md) | Least-privilege matrix defining read-only operations, Level 1 safe commands, and Level 2 human-authorized boundaries. |
-| [`_docs/manual-test.md`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/_docs/manual-test.md) | 6-step manual end-to-end verification journey used to cross-check UI and backend integration. |
-| [`on-call-engineer/autonomy-policy.json`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/on-call-engineer/autonomy-policy.json) | Machine-readable autonomy policy evaluated by code outside the LLM during incident response. |
+| [`product-spec.md`](product-spec.md) *(bridged to `_docs/specs.md`)* | Canonical source of truth for personas, entities (Household, Member, Chore, Swap, Reward), business logic, and anti-goals. |
+| [`constitution.md`](constitution.md) *(bridged to `AGENTS.md`)* | Project supreme law declaring negative invariants, boundary rules, zero-host execution mandate, and decision gate sequencing. |
+| [`contracts/openapi.yaml`](contracts/openapi.yaml) *(bridged to `openapi.yaml`)* | Frozen API contract. Neither frontend nor backend agents could modify this file unilaterally. |
+| [`docs/permissions.md`](docs/permissions.md) | Least-privilege matrix defining read-only operations, Level 1 safe commands, and Level 2 human-authorized boundaries. |
+| [`_docs/manual-test.md`](_docs/manual-test.md) | 6-step manual end-to-end verification journey used to cross-check UI and backend integration. |
+| [`on-call-engineer/autonomy-policy.json`](on-call-engineer/autonomy-policy.json) | Machine-readable autonomy policy evaluated by code outside the LLM during incident response. |
 
 ---
 
@@ -84,7 +84,7 @@ The human developer acted as the final authority at every critical juncture:
 6. **Gate 14 (Plugin Evaluation Sign-Off)**: Human reviewed the 100% compliant Agent Extension Pack evaluation deliverable.
 
 ### B. Code Review & Verification Workflow
-- **Git Diffs**: Every change was inspected using `rtk git diff` before staging and committing.
+- **Git Diffs**: Every change was inspected using `git diff` before staging and committing.
 - **Contract Drift Audits**: Verified with `verify-spec-drift` to ensure zero drift between code routes and `contracts/openapi.yaml`.
 - **Anti-Tautology Verification**: Guarded against false-positive "always green" test suites using mutation testing (`run-mutation-test`).
 
@@ -95,7 +95,7 @@ The human developer acted as the final authority at every critical juncture:
 | Verification Gate | Enforcement Mechanism | Pass Criteria | Result |
 |---|---|---|---|
 | **Zero-Host-Runtime Mandate** | System prompt & Makefile targets | Zero compiler/toolchain dependencies on the host OS | ✅ 100% containerized |
-| **Safety Interceptor Hook** | Bash pre-tool hook ([`com.antigravity.client/hooks/pre-tool-guardrail.sh`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/com.antigravity.client/hooks/pre-tool-guardrail.sh)) | Destructive commands (`rm -rf`, `DROP TABLE`, unallowlisted binaries) blocked | ✅ Active & verified |
+| **Safety Interceptor Hook** | Bash pre-tool hook ([`com.antigravity.client/hooks/pre-tool-guardrail.sh`](com.antigravity.client/hooks/pre-tool-guardrail.sh)) | Destructive commands (`rm -rf`, `DROP TABLE`, unallowlisted binaries) blocked | ✅ Active & verified |
 | **Deterministic SAST** | Containerized Semgrep (`security-audit/semgrep-rules.yml`) | Zero OWASP vulnerabilities, zero SQL injections, zero hardcoded credentials across 83 files | ✅ 0 issues found |
 | **Backend Integration Suite** | Dockerized Go test runner against PostgreSQL 16 container | 15/15 unit and integration test packages passing | ✅ 15/15 passing (100%) |
 | **Playwright E2E Suite** | Containerized Playwright testing all 12 user journeys | 12/12 journeys passing (including Floci S3/SQS and tablet mode) | ✅ 12/12 passing (100%) |
@@ -111,5 +111,5 @@ The human developer acted as the final authority at every critical juncture:
 
 - **Zero Secret Exposure**: No production API keys, database credentials, or private tokens are embedded in source code, committed to Git, or passed to AI models. All secrets are injected at runtime via environment variables loaded from `.gitignore`d `.env` files.
 - **Credential Scrubbing**: Test fixtures use synthetic, seeded credentials (e.g. `alex@example.com`, bcrypt hashed passwords) with strict multi-tenant isolation.
-- **Bounded Telemetry Boundaries**: On-call responder subagents access telemetry (Prometheus, Loki, Tempo) exclusively through read-only allowlisted endpoints via [`on-call-engineer/scripts/collect-evidence`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/on-call-engineer/scripts/collect-evidence). Direct database write credentials are never provided to autonomous responders.
-- **Outside-the-Model Action Authorization**: Remediation actions proposed by LLMs cannot be executed directly; they must pass through deterministic policy evaluation ([`on-call-engineer/scripts/authorize-action`](file:///home/manish/AI-Practice/DataTalks/ai-dev-tools-zoomcamp-2026/modules/01-ai-native-workflow/household-chores/on-call-engineer/scripts/authorize-action)) enforcing Level 1 auto-approval vs Level 2 human escalation.
+- **Bounded Telemetry Boundaries**: On-call responder subagents access telemetry (Prometheus, Loki, Tempo) exclusively through read-only allowlisted endpoints via [`on-call-engineer/scripts/collect-evidence`](on-call-engineer/scripts/collect-evidence). Direct database write credentials are never provided to autonomous responders.
+- **Outside-the-Model Action Authorization**: Remediation actions proposed by LLMs cannot be executed directly; they must pass through deterministic policy evaluation ([`on-call-engineer/scripts/authorize-action`](on-call-engineer/scripts/authorize-action)) enforcing Level 1 auto-approval vs Level 2 human escalation.

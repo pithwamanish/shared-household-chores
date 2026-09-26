@@ -50,31 +50,41 @@ household-chores/
 ```
 
 ### Boundary & Operational Constraints
-1. **Repository Boundary**: Confine all file reads, writes, and terminal commands strictly to this repository. Never inspect, search, or read parent (`..`) or sibling directories.
-2. **Git & Commits**: Make focused, regular commits explaining the architectural rationale in the commit message.
-3. **Process & Orchestration**: Follow the multi-agent orchestration graph defined in [`_docs/process.md`](_docs/process.md).
-4. **Frontend Isolation**: Frontend agents MUST NOT alter backend source files, database schemas, or deployment configs.
-5. **Backend Isolation**: Backend agents MUST NOT edit frontend components or styling.
-6. **Contract Immobility**: Neither Frontend nor Backend agents may alter [`contracts/openapi.yaml`](contracts/openapi.yaml) unilaterally. Changes to the contract require prior PM alignment and contract synchronization.
-7. **Documentation Integrity**: Do not delete existing comments, architectural decisions, or docstrings unless explicitly requested.
+1. **Constitutional Supreme Law**: All agents must strictly respect the negative invariants defined in [`constitution.md`](constitution.md) (zero host runtimes, zero plaintext credentials, zero direct DB mutations, contract immobility).
+2. **Repository Boundary**: Confine all file reads, writes, and terminal commands strictly to this repository. Never inspect, search, or read parent (`..`) or sibling directories.
+3. **Git & Worktree Isolation**: Make focused, regular commits explaining the architectural rationale. Parallel feature work must execute in isolated Git worktrees (`.worktrees/task-<ID>`).
+4. **Process & Orchestration**: Follow the multi-agent orchestration graph defined in [`_docs/process.md`](_docs/process.md).
+5. **Frontend Isolation**: Frontend agents MUST NOT alter backend source files, database schemas, or deployment configs.
+6. **Backend Isolation**: Backend agents MUST NOT edit frontend components or styling.
+7. **Contract Immobility**: Neither Frontend nor Backend agents may alter [`contracts/openapi.yaml`](contracts/openapi.yaml) unilaterally. Changes to the contract require prior PM alignment and contract synchronization.
+8. **Documentation Integrity**: Do not delete existing comments, architectural decisions, or docstrings unless explicitly requested.
 
 ---
 
 ## 3. Development Lifecycle (Spec-Driven Architecture)
 
-Every agent operates within the 9-step AI-Native Spec-Driven Lifecycle:
+Every agent operates within the comprehensive AI-Native Spec-Driven Lifecycle tracked in [`_docs/state.md`](_docs/state.md):
 
-| Step | Milestone | Canonical Artifact | Status |
+| Gate / Step | Milestone | Canonical Artifact | Status |
 | :--- | :--- | :--- | :--- |
-| **Step 1** | Product & Technical Spec | `_docs/specs.md` | ✅ Complete |
-| **Step 2** | Frontend Prototype | `frontend/` (Mock services) | ✅ Complete |
-| **Step 3** | Manual Test Scenario | `_docs/manual-test.md` | ✅ Complete |
-| **Step 4** | Repository Constitution | `AGENTS.md` | ✅ Complete |
-| **Step 5** | Contract Freeze | `contracts/openapi.yaml` | ✅ Complete |
-| **Step 6** | Stack & Free-Tier Decision | `_docs/stack.md` | ✅ Complete |
-| **Step 7** | Backend Scaffold & In-Memory Store | `backend/` | ✅ Complete |
-| **Step 8** | Multi-Agent Task Orchestration | `_docs/tasks.md` + Worktrees | ✅ Complete |
-| **Step 9** | E2E Automated Verification | `e2e/` (Playwright) | ✅ Complete |
+| **Gate 0** | Track Selection & Archetype Confirmation | `AGENTS.md`, `constitution.md` | ✅ Complete |
+| **Pre-Step 1**| Working Backwards PRFAQ | `PRFAQ.md` / `_docs/prfaq.md` | ✅ Complete |
+| **Gate 1 (Step 1)** | Scoping & Functional Spec | `_docs/specs.md` (`product-spec.md`) | ✅ Complete |
+| **Gate 2 (Step 2)** | Frontend Prototype & Service Mock | `frontend/` | ✅ Complete |
+| **Gate 3 (Step 3)** | Manual Verification Journey | `_docs/manual-test.md` | ✅ Complete |
+| **Gate 4 (Step 4)** | Governance Bundle & BMAD Squad | `AGENTS.md`, `.bmad/`, `_docs/process.md` | ✅ Complete |
+| **Gate 5 (Step 5)** | Contract Freeze (OpenAPI 3.1) | `contracts/openapi.yaml` | ✅ Complete |
+| **Gate 6 (Step 6)** | Stack Decision & Nygard ADR | `_docs/stack.md`, `docs/adr/` | ✅ Complete |
+| **Gate 7 (Step 7)** | Backend Foundation & In-Memory Store | `backend/` | ✅ Complete |
+| **Gate 8 (Step 8)** | Multi-Agent Task Orchestration | `_docs/tasks.md` + Worktrees | ✅ Complete |
+| **Gate 9 (Step 9)** | Playwright E2E Verification Suite | `e2e/` (Containerized) | ✅ Complete |
+| **Gate 10** | Local Kubernetes Deployment (Kind) | `k8s/`, `k8s/verify` | ✅ Complete |
+| **Gate 11** | Local CI/CD (Act & Kind Rollout) | `.github/workflows/ci.yml` | ✅ Complete |
+| **Gate 12** | Deterministic Security (Semgrep) & On-Call | `security-audit/`, `on-call-engineer/` | ✅ Complete |
+| **Gate 13** | Agent Extension Pack (Agent Plugins 1.0) | `plugin.json`, `mcp.json`, `skills/` | ✅ Complete |
+| **Gate 14** | Plugin Conformance Evaluation | `_docs/agent-extension-pack-evaluation.md` | ✅ Complete |
+| **Gate 15** | Living Spec Drift & Mutation Testing | `verify-spec-drift`, `run-mutation-test` | ✅ Complete |
+| **Gate 16** | AI Tools Usage & Canonical Repository | `docs/ai-tools-usage-and-review.md`, `README.md` | ✅ Complete |
 
 ---
 

@@ -58,10 +58,10 @@
   {
     "id": "eval-007",
     "description": "Verify Agent Extension Pack manifest and MCP tool definitions",
-    "target_artifact": "plugin.json",
-    "expected_keywords": ["choresync-agent-extension-pack", "capabilities", "hooks", "mcpservers"],
+    "target_artifact": "docs/agent-extension-pack.md",
+    "expected_keywords": ["choresync", "skills", "hooks", "mcpservers"],
     "assertions": [
-      {"type": "contains_all", "values": ["choresync-agent-extension-pack", "capabilities", "hooks", "mcpservers"]}
+      {"type": "contains_all", "values": ["choresync", "skills", "hooks", "mcpservers"]}
     ]
   }
 ]

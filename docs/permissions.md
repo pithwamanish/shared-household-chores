@@ -32,27 +32,30 @@ Autonomous AI agents and subagents operate under **strict read-preferred, bounde
 - `git status` / `git diff` / `git log`
 - `curl -s http://localhost:<PORT>/healthz`
 - `python3 mcp-server/server.py`
-- `make ext-verify` / `make ext-mcp-test`
+- `make ext-verify` / `make ext-eval` / `make ext-mcp-test` / `make ext-capabilities`
 - `make k8s-verify` / `make oncall-verify`
+- `bash skills/<skill>/scripts/<script>.sh`
 
-### Forbidden / Blocked Commands (Enforced by `agent-hooks/pre-tool-guardrail.sh`)
+### Forbidden / Blocked Commands (Enforced by `com.antigravity.client/hooks/pre-tool-guardrail.sh`)
 - Destructive filesystem deletions: `rm -rf /` or `rm -rf ~`
 - Unparameterized database drops: `DROP DATABASE`, `TRUNCATE TABLE`, `DELETE FROM * WHERE 1=1`
 - Git overrides: `git push --force` or `git push -f` to protected branches (`main`, `master`)
+- Bare-metal host execution: compiling or running code on the host outside containers
 - Arbitrary secret exfiltration: direct dumping of environment files containing production secrets
 
 ---
 
 ## 4. MCP Server Security & Tool Permissions
 
-All Model Context Protocol tools declared in `mcp-server/mcp.json` operate with read-only inspection scopes:
+All Model Context Protocol tools declared in `mcp.json` operate with read-only inspection scopes:
 1. **`inspect_choresync_health`**: Probes local HTTP health endpoints and Docker container state; does not mutate containers.
 2. **`inspect_openapi_contract`**: Reads `contracts/openapi.yaml`; does not write or modify contracts unilaterally.
 3. **`inspect_db_schema`**: Parses `backend/internal/db/schema.sql` statically; does not issue live write queries or alter database state.
 4. **`inspect_cloud_emulator`**: Returns Floci S3 and SQS configuration metadata without writing to production cloud credentials.
+5. **`inspect_chore_operations`**: Inspects active chores, approval gates, and archetype configurations without modifying chore records.
 
 ---
 
 ## 5. Audit Trail & Compliance
 
-Every tool invocation and guardrail outcome is logged to `agent-hooks/audit.log` via `agent-hooks/post-tool-audit.sh` with timestamp, tool name, and exit status.
+Every tool invocation and guardrail outcome is logged to `com.antigravity.client/hooks/audit.log` via `com.antigravity.client/hooks/post-tool-audit.sh` with timestamp, tool name, and exit status.

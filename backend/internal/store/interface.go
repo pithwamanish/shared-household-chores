@@ -59,4 +59,6 @@ type Store interface {
 	RegisterMember(req models.RegisterRequest) (*models.Member, *models.Household, error)
 	CreatePasswordResetToken(email string) (string, *models.Member, error)
 	ResetPasswordWithToken(token, newPassword string) (*models.Member, *models.Household, error)
+	UpdatePassword(memberID, password string) error
 }
+

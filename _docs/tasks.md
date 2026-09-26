@@ -21,6 +21,7 @@ This document tracks all implementation, testing, and infrastructure tasks for *
 | **TASK-011** | Actionable Alerting & Autonomous Incident Response (Gates 11 & 12) | SRE | `DONE` | `feat/task-011-alerts-incident-response` | None |
 | **TASK-012** | Local Kubernetes Deployment with Kind (Gate 10) | SRE | `DONE` | `feat/task-012-k8s-kind` | None |
 | **TASK-013** | Local Cloud Emulator Integration (Floci: S3 + SQS) | SRE / SWE | `DONE` | `feat/task-013-cloud-emulator` | None |
+| **TASK-014** | Supabase Public Auth & Password Reset Integration | SWE | `DONE` | `feat/task-014-supabase-auth` | TASK-007 |
 
 ---
 
@@ -570,6 +571,47 @@ Integrate Floci (`floci/floci:latest`) as an ultra-lightweight (<50MB RAM) local
 - [x] Full Go backend unit tests pass 100%
 - [x] Full Playwright E2E suite (12/12 journeys) passes 100%
 - [x] Zero code forking: standard AWS SDK Go v2 used with environment variable configuration
+
+---
+
+### TASK-014: Supabase Public Auth & Password Reset Integration
+
+## Objective
+Provide optional public alpha delivery authentication and password recovery powered by Supabase Auth (`@supabase/supabase-js`) while maintaining full backwards compatibility with native JWT and mock email providers.
+
+## Context
+- Specs: `_docs/specs.md` (Section 4.6)
+- Contract: `contracts/openapi.yaml` (`/api/auth/supabase-login`)
+- Manual Test Journey: `_docs/manual-test.md` (Step 1)
+
+## Scope & File Boundaries
+- **Assigned Role**: SWE
+- **Branch / Worktree**: `feat/task-014-supabase-auth` / `.worktrees/task-014`
+- **Files**:
+  - `contracts/openapi.yaml`
+  - `backend/internal/handlers/auth.go`
+  - `backend/internal/email/service.go`
+  - `backend/internal/email/supabase.go`
+  - `backend/internal/server/router.go`
+  - `frontend/src/services/supabase.ts`
+  - `frontend/src/services/api.ts`
+  - `frontend/src/components/LoginView.tsx`
+
+## Subtasks
+- [x] Add `/api/auth/supabase-login` endpoint to OpenAPI 3.1 contract (`contracts/openapi.yaml`)
+- [x] Implement Supabase token verification and auto-provisioning handler in `backend/internal/handlers/auth.go`
+- [x] Implement Supabase transactional email service in `backend/internal/email/supabase.go`
+- [x] Scaffold client-side Supabase client in `frontend/src/services/supabase.ts`
+- [x] Wire Supabase session listener and password reset recovery in `frontend/src/components/LoginView.tsx`
+- [x] Verify seamless fallback to native email/password when Supabase environment variables are unset
+
+## Acceptance Criteria
+- [x] When `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` are provided, frontend offers Supabase magic link and password reset
+- [x] `/api/auth/supabase-login` exchanges valid Supabase access token for ChoreSync JWT claims
+- [x] Zero regressions on existing email/password and mock dev mailbox authentication
+- [x] Go backend tests pass 100% inside container
+- [x] OpenAPI spec drift check passes with 0 drift
+
 
 
 

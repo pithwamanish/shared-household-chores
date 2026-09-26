@@ -17,6 +17,12 @@ import {
   DevEmail,
 } from '../types';
 import { httpClient, isNetworkError, ApiError } from './httpClient';
+import {
+  isSupabaseConfigured,
+  sendSupabaseMagicLink,
+  sendSupabasePasswordReset,
+  supabase,
+} from './supabase';
 
 const STORAGE_KEY = 'choresync_storage_v1';
 
@@ -1541,16 +1547,45 @@ async function withFallback<T>(
 export const api = {
   // Auth operations
   async login(email: string, password: string): Promise<AuthTokenResponse> {
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    // 1. If Supabase is configured, attempt Supabase Auth first
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: cleanPassword,
+        });
+
+        if (!error && data?.session) {
+          // Logged in via Supabase Auth! Exchange session and sync password to backend
+          return await api.supabaseLogin(
+            data.session.access_token,
+            data.session.user.email || cleanEmail,
+            data.session.user.user_metadata?.name || '',
+            cleanPassword
+          );
+        }
+      } catch (err) {
+        console.warn('Supabase password login error, checking local backend:', err);
+      }
+    }
+
+    // 2. Local / fallback backend login
     return withFallback(
       'login',
       async () => {
-        const res = await httpClient.post<AuthTokenResponse>('/auth/login', { email, password });
+        const res = await httpClient.post<AuthTokenResponse>('/auth/login', {
+          email: cleanEmail,
+          password: cleanPassword,
+        });
         if (res?.access_token) {
           httpClient.setAuthToken(res.access_token);
         }
         return res;
       },
-      () => localApi.login(email, password)
+      () => localApi.login(cleanEmail, cleanPassword)
     );
   },
 
@@ -1583,8 +1618,31 @@ export const api = {
     return res;
   },
 
-  async requestMagicLink(email: string): Promise<{ message: string; token?: string }> {
-    return httpClient.post<{ message: string; token?: string }>('/auth/magic-link', { email });
+  async requestMagicLink(email: string): Promise<{ message: string; token?: string; link?: string }> {
+    if (isSupabaseConfigured) {
+      const { error } = await sendSupabaseMagicLink(email);
+      if (error) {
+        console.warn('Supabase email dispatch failed:', error.message, 'Falling back to ChoreSync backend magic link generator.');
+        try {
+          const fallbackRes = await httpClient.post<{ message: string; token?: string; link?: string }>('/auth/magic-link', { email });
+          let reason = 'External email provider rejected delivery';
+          if (error.message.includes('rate limit') || error.message.includes('over_email_send_rate_limit')) {
+            reason = 'Supabase default mailer rate limit reached (3 emails/hr)';
+          } else if (error.message.includes('confirmation email') || error.message.includes('validation_error')) {
+            reason = 'Resend test mode restricts emails to registered account owner';
+          }
+          return {
+            message: `${reason}. Instant login token generated below!`,
+            token: fallbackRes.token,
+            link: fallbackRes.link,
+          };
+        } catch (fallbackErr: any) {
+          throw error;
+        }
+      }
+      return { message: `Magic login link sent to ${email} via Supabase Auth!` };
+    }
+    return httpClient.post<{ message: string; token?: string; link?: string }>('/auth/magic-link', { email });
   },
 
   async verifyMagicLink(token: string): Promise<AuthTokenResponse> {
@@ -1600,11 +1658,46 @@ export const api = {
   },
 
   async requestPasswordReset(email: string): Promise<ForgotPasswordResponse> {
+    if (isSupabaseConfigured) {
+      const { error } = await sendSupabasePasswordReset(email);
+      if (error) {
+        console.warn('Supabase password reset email dispatch failed:', error.message, 'Falling back to ChoreSync backend reset token.');
+        try {
+          const fallbackRes = await httpClient.post<ForgotPasswordResponse>('/auth/forgot-password', { email });
+          let reason = 'External email provider rejected delivery';
+          if (error.message.includes('rate limit') || error.message.includes('over_email_send_rate_limit')) {
+            reason = 'Supabase default mailer rate limit reached (3 emails/hr)';
+          } else if (error.message.includes('confirmation email') || error.message.includes('validation_error')) {
+            reason = 'Resend test mode restricts emails to registered account owner';
+          }
+          return {
+            ...fallbackRes,
+            message: `${reason}. Instant recovery token generated below!`,
+          };
+        } catch (fallbackErr: any) {
+          throw error;
+        }
+      }
+      return { message: `Password reset link sent to ${email} via Supabase Auth!` };
+    }
     return httpClient.post<ForgotPasswordResponse>('/auth/forgot-password', { email });
   },
 
   async resetPassword(token: string, new_password: string): Promise<AuthTokenResponse> {
     const res = await httpClient.post<AuthTokenResponse>('/auth/reset-password', { token, new_password });
+    if (res?.access_token) {
+      httpClient.setAuthToken(res.access_token);
+    }
+    return res;
+  },
+
+  async supabaseLogin(accessToken: string, email: string, name?: string, password?: string): Promise<AuthTokenResponse> {
+    const res = await httpClient.post<AuthTokenResponse>('/auth/supabase-login', {
+      access_token: accessToken,
+      email,
+      name,
+      password,
+    });
     if (res?.access_token) {
       httpClient.setAuthToken(res.access_token);
     }

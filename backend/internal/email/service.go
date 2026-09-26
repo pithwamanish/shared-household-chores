@@ -31,6 +31,11 @@ type Config struct {
 	SMTPPort string
 	SMTPUser string
 	SMTPPass string
+
+	// Supabase specific
+	SupabaseURL        string
+	SupabaseAnonKey    string
+	SupabaseServiceKey string
 }
 
 // LoadConfigFromEnv reads email configuration from environment variables.
@@ -40,6 +45,9 @@ func LoadConfigFromEnv() Config {
 	smtpHost := strings.TrimSpace(os.Getenv("SMTP_HOST"))
 	from := strings.TrimSpace(os.Getenv("EMAIL_FROM"))
 	baseURL := strings.TrimSpace(os.Getenv("APP_BASE_URL"))
+	supabaseURL := strings.TrimSpace(os.Getenv("SUPABASE_URL"))
+	supabaseAnonKey := strings.TrimSpace(os.Getenv("SUPABASE_ANON_KEY"))
+	supabaseServiceKey := strings.TrimSpace(os.Getenv("SUPABASE_SERVICE_ROLE_KEY"))
 
 	if baseURL == "" {
 		baseURL = "http://localhost:3000"
@@ -55,7 +63,9 @@ func LoadConfigFromEnv() Config {
 
 	// Auto-detect provider if not explicitly configured
 	if provider == "" {
-		if resendKey != "" {
+		if supabaseURL != "" && supabaseAnonKey != "" {
+			provider = "supabase"
+		} else if resendKey != "" {
 			provider = "resend"
 		} else if smtpHost != "" {
 			provider = "smtp"
@@ -64,15 +74,23 @@ func LoadConfigFromEnv() Config {
 		}
 	}
 
+	smtpPass := strings.TrimSpace(os.Getenv("SMTP_PASS"))
+	if strings.Contains(smtpHost, "gmail") {
+		smtpPass = strings.ReplaceAll(smtpPass, " ", "")
+	}
+
 	return Config{
-		Provider:     provider,
-		FromAddress:  from,
-		AppBaseURL:   baseURL,
-		ResendAPIKey: resendKey,
-		SMTPHost:     smtpHost,
-		SMTPPort:     os.Getenv("SMTP_PORT"),
-		SMTPUser:     os.Getenv("SMTP_USER"),
-		SMTPPass:     os.Getenv("SMTP_PASS"),
+		Provider:           provider,
+		FromAddress:        from,
+		AppBaseURL:         baseURL,
+		ResendAPIKey:       resendKey,
+		SMTPHost:           smtpHost,
+		SMTPPort:           os.Getenv("SMTP_PORT"),
+		SMTPUser:           os.Getenv("SMTP_USER"),
+		SMTPPass:           smtpPass,
+		SupabaseURL:        supabaseURL,
+		SupabaseAnonKey:    supabaseAnonKey,
+		SupabaseServiceKey: supabaseServiceKey,
 	}
 }
 
@@ -81,6 +99,14 @@ func NewServiceFromEnv() Service {
 	cfg := LoadConfigFromEnv()
 
 	switch cfg.Provider {
+	case "supabase":
+		if cfg.SupabaseURL == "" || cfg.SupabaseAnonKey == "" {
+			log.Println("[EMAIL] Warning: SUPABASE_URL or SUPABASE_ANON_KEY is not set. Falling back to Mock email provider.")
+			return NewMockService(cfg)
+		}
+		log.Printf("[EMAIL] Initialized Supabase Auth Email Service (Endpoint: %s)", cfg.SupabaseURL)
+		return NewSupabaseService(cfg)
+
 	case "resend":
 		if cfg.ResendAPIKey == "" {
 			log.Println("[EMAIL] Warning: RESEND_API_KEY is not set. Falling back to Mock email provider.")

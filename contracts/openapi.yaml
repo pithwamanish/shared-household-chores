@@ -102,6 +102,42 @@ paths:
         '404':
           $ref: '#/components/responses/NotFoundError'
 
+  /api/auth/supabase-login:
+    post:
+      tags: [Auth]
+      summary: Authenticate or auto-provision member via Supabase Auth
+      description: Exchanges a verified Supabase access token or email for ChoreSync session claims and member profile.
+      operationId: supabaseLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                access_token:
+                  type: string
+                  description: Supabase JWT access token for cryptographic validation
+                email:
+                  type: string
+                  format: email
+                  description: User email address verified by Supabase
+                name:
+                  type: string
+                  description: User display name from Supabase user_metadata
+      responses:
+        '200':
+          description: Supabase authentication exchanged successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/auth/login:
     post:
       tags: [Auth]

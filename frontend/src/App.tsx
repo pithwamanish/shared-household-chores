@@ -409,11 +409,14 @@ function ChoreSyncApp() {
     showToast(`Welcome back, ${authData.member.name}!`, 'success');
   }, [showToast]);
 
+  const verifyingTokenRef = useRef<string | null>(null);
+
   // Handle direct Magic Link URL navigation (?magic_token=...)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const magicToken = urlParams.get('magic_token');
-    if (magicToken) {
+    if (magicToken && verifyingTokenRef.current !== magicToken) {
+      verifyingTokenRef.current = magicToken;
       setIsVerifyingMagic(true);
       api.verifyMagicLink(magicToken.trim())
         .then((authData) => {

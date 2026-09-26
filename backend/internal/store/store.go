@@ -1648,4 +1648,26 @@ func (s *MemoryStore) ResetPasswordWithToken(token, newPassword string) (*models
 	return &memCopy, &hCopy, nil
 }
 
+// UpdatePassword updates a member's password hash in memory.
+func (s *MemoryStore) UpdatePassword(memberID, password string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	member, ok := s.members[memberID]
+	if !ok {
+		return ErrNotFound
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	member.PasswordHash = string(hash)
+	member.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	s.members[memberID] = member
+	return nil
+}
+
+
 
