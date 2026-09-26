@@ -431,7 +431,7 @@ Define symptom-based Prometheus alert rules for critical user impact, wire Alert
   - `on-call-engineer/payload-schema.json`
   - `on-call-engineer/prompt.md`
   - `on-call-engineer/runbook.md`
-  - `on-call-engineer/receiver.py`
+  - `on-call-engineer/receiver.go`
   - `on-call-engineer/scripts/receive-alert`
   - `on-call-engineer/scripts/invoke-agent`
   - `on-call-engineer/scripts/trigger-test-incident`

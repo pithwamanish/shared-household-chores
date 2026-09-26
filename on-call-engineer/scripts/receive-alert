@@ -46,7 +46,7 @@ else
   }'
 fi
 
-# Send to running receiver if available, else process via dockerized python runner
+# Send to running receiver if available, else process via ephemeral Go container
 if curl -s -f "http://localhost:5050/healthz" > /dev/null 2>&1; then
   echo "Delivering alert payload to active receiver on $RECEIVER_URL..."
   RESPONSE="$(curl -s -X POST "$RECEIVER_URL" -H "Content-Type: application/json" -d "$PAYLOAD")"
@@ -56,8 +56,8 @@ else
   docker run --rm -i \
     -v "$ON_CALL_DIR":/app \
     -w /app \
-    python:3.11-alpine \
-    python3 receiver.py --stdin <<< "$PAYLOAD"
+    golang:1.22-alpine \
+    go run receiver.go --stdin <<< "$PAYLOAD"
 fi
 
 echo "=== [ON-CALL] Alert Ingest Complete ==="

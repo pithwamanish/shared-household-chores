@@ -52,12 +52,13 @@ services:
       - observability-net
 
   on-call-receiver:
-    image: python:3.11-alpine
+    build:
+      context: ../on-call-engineer
+      dockerfile: Dockerfile
+    image: choresync-on-call-receiver:dev-latest
     container_name: observability-on-call-receiver
-    working_dir: /app
     volumes:
-      - ../on-call-engineer:/app
-    command: ["python3", "-u", "receiver.py"]
+      - ../on-call-engineer/incidents:/app/incidents
     ports:
       - "5050:5050"
     restart: unless-stopped

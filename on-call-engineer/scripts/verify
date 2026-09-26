@@ -19,7 +19,7 @@ REQUIRED_FILES=(
   "$ON_CALL_DIR/autonomy-policy.json"
   "$ON_CALL_DIR/prompt.md"
   "$ON_CALL_DIR/runbook.md"
-  "$ON_CALL_DIR/receiver.py"
+  "$ON_CALL_DIR/receiver.go"
   "$SCRIPT_DIR/receive-alert"
   "$SCRIPT_DIR/invoke-agent"
   "$SCRIPT_DIR/collect-evidence"
@@ -58,30 +58,15 @@ else
   echo "  ! Note: Prometheus container not reachable on port 9090; skipping live API check"
 fi
 
-# Check 3: Validate JSON Schema on payload-schema.json
-echo "[3/8] Validating payload-schema.json syntax..."
-docker run --rm -v "$ON_CALL_DIR":/app -w /app python:3.11-alpine python3 -c '
-import json
-with open("payload-schema.json", "r") as f:
-    schema = json.load(f)
-assert schema.get("title") == "NormalizedAlertIncidentPayload"
-assert "alert" in schema.get("properties", {})
-assert "service" in schema.get("properties", {})
-assert "metric" in schema.get("properties", {})
-print("  ✓ payload-schema.json syntax valid")
-'
+# Check 3: Validate JSON Schema on payload-schema.json via Go unit tests
+echo "[3/8] Validating payload-schema.json syntax via Go unit test..."
+docker run --rm -v "$ON_CALL_DIR":/app -w /app golang:1.22-alpine go test -v -run TestPayloadSchemaSyntax . > /dev/null
+echo "  ✓ payload-schema.json syntax valid"
 
-# Check 4: Validate Autonomy Policy JSON
-echo "[4/8] Validating autonomy-policy.json syntax and structure..."
-docker run --rm -v "$ON_CALL_DIR":/app -w /app python:3.11-alpine python3 -c '
-import json
-with open("autonomy-policy.json", "r") as f:
-    policy = json.load(f)
-assert policy.get("title") == "ChoreSync On-Call Autonomy Policy"
-assert "LEVEL_1_AUTO_EXECUTE" in policy.get("autonomy_levels", {})
-assert "forbidden_patterns" in policy
-print("  ✓ autonomy-policy.json structure valid")
-'
+# Check 4: Validate Autonomy Policy JSON via Go unit tests
+echo "[4/8] Validating autonomy-policy.json syntax and structure via Go unit test..."
+docker run --rm -v "$ON_CALL_DIR":/app -w /app golang:1.22-alpine go test -v -run TestAutonomyPolicyStructure . > /dev/null
+echo "  ✓ autonomy-policy.json structure valid"
 
 # Check 5: Test Triggering Synthetic Incident
 echo "[5/8] Executing synthetic incident trigger..."

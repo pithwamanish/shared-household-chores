@@ -36,7 +36,7 @@ When an alert triggers, an autonomous AI reliability engineer investigates, repr
 ```mermaid
 flowchart TD
     Prom["Prometheus Alert Fires\n(HighHttpErrorRate)"] --> AM["Alertmanager (:9093)"]
-    AM --> Recv["On-Call Receiver (:5050)\n(receiver.py)"]
+    AM --> Recv["On-Call Receiver (:5050)\n(receiver.go)"]
     Recv --> Norm["Normalize Payload via\npayload-schema.json"]
     Norm --> Store["Persist in\non-call-engineer/incidents/*.json"]
     Store --> Agent["Headless On-Call Agent Invocation\n(invoke-agent)"]
@@ -58,7 +58,9 @@ on-call-engineer/
 ├── payload-schema.json          # Machine-verifiable JSON Schema for alert payloads
 ├── prompt.md                    # Standalone system prompt for headless on-call agent execution
 ├── runbook.md                   # Triage runbook for HighHttpErrorRate, HighRequestLatency, DB errors
-├── receiver.py                  # Webhook receiver & payload normalizer (port 5050)
+├── receiver.go                  # Go standard library webhook receiver & normalizer (port 5050)
+├── receiver_test.go             # Unit tests for schema syntax and webhook normalization
+├── Dockerfile                   # Multi-stage production container build for Go receiver
 ├── incidents/                   # Structured ledger of received incidents (JSON)
 │   └── inc-<timestamp>-<alert>.json
 └── scripts/

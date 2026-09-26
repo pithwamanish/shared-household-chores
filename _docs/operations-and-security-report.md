@@ -121,7 +121,7 @@ The resilience loop was exercised through an intentional fault injection drill:
    - Trigger: Simulated burst of HTTP 500 requests against `/api` endpoints simulating downstream failure.
 2. **Detection & Normalization**:
    - Prometheus alert `HighHttpErrorRate` breached threshold (`http_requests_total{status=~"5.."}`).
-   - Webhook delivered to receiver (`receiver.py` on port 5050).
+   - Webhook delivered to receiver (`receiver.go` on port 5050).
    - Normalized into `on-call-engineer/incidents/inc-*.json` conforming to `NormalizedAlertIncidentPayload` schema.
 3. **Bounded Evidence Assembly**:
    - `collect-evidence` assembled evidence packet `on-call-engineer/evidence.json` capturing git commit history, 5xx status, container health, and Loki logs without exposing database secrets.
