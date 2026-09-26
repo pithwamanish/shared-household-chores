@@ -18,6 +18,7 @@ spec:
         app.kubernetes.io/name: floci
         app.kubernetes.io/part-of: choresync
     spec:
+      enableServiceLinks: false
       containers:
         - name: floci
           image: floci/floci:latest
@@ -30,6 +31,8 @@ spec:
               value: "s3,sqs"
             - name: DEFAULT_REGION
               value: "us-east-1"
+            - name: FLOCI_PORT
+              value: "4566"
           resources:
             requests:
               cpu: 50m
