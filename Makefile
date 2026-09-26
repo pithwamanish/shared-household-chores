@@ -8,9 +8,9 @@ compat:
 	@ln -sf AGENTS.md .windsurfrules
 	@mkdir -p .github && ln -sf ../AGENTS.md .github/copilot-instructions.md
 	@mkdir -p .claude .cursor
-	@ln -sf ../.agents/skills .claude/skills 2>/dev/null || true
-	@ln -sf ../.agents/agents .claude/agents 2>/dev/null || true
-	@ln -sf ../.agents/skills .cursor/skills 2>/dev/null || true
+	@ln -sfn ../skills .claude/skills 2>/dev/null || true
+	@ln -sfn ../custom-agent .claude/agents 2>/dev/null || true
+	@ln -sfn ../skills .cursor/skills 2>/dev/null || true
 	@ln -sf specs.md _docs/plan.md 2>/dev/null || true
 	@ln -sf _docs/specs.md PLAN.md 2>/dev/null || true
 	@ln -sf _docs/specs.md PRD.md 2>/dev/null || true
@@ -25,12 +25,12 @@ compat:
 	@echo "Compatibility bridges active!"
 
 setup: compat
-	@echo "Setting up development environment..."
-	@cd frontend && (bun install || npm install 2>/dev/null || true)
+	@echo "Setting up development environment inside container..."
+	@docker run --rm -v $$(pwd)/frontend:/app -w /app node:22-slim npm install
 
 dev:
-	@echo "Starting development environment..."
-	@cd frontend && (bun run dev || npm run dev 2>/dev/null || true)
+	@echo "Starting full development environment inside containers..."
+	@docker compose up -d
 
 backend-dev:
 	@echo "Starting Go backend server inside container..."
@@ -40,13 +40,15 @@ backend-test:
 	@echo "Running Go backend unit and integration tests inside container..."
 	@docker run --rm -v $$(pwd)/backend:/app -w /app golang:1.22-alpine go test ./...
 
-lint:
-	@echo "Running lint checks..."
-	@cd frontend && (bun run lint || npm run lint 2>/dev/null || true)
+frontend-test:
+	@echo "Running frontend unit and integration tests inside container..."
+	@docker run --rm -v $$(pwd)/frontend:/app -w /app node:22-slim npm test
 
-test: backend-test
-	@echo "Running frontend unit and integration tests..."
-	@cd frontend && (bun run test || npm run test 2>/dev/null || true)
+lint:
+	@echo "Running lint checks inside container..."
+	@docker run --rm -v $$(pwd)/frontend:/app -w /app node:22-slim npm run lint
+
+test: backend-test frontend-test
 
 test-fast:
 	@echo "Running targeted Go test in container for pattern: $(TARGET)..."
@@ -65,6 +67,13 @@ compose-up:
 
 compose-down:
 	@docker compose down -v
+
+clean:
+	@echo "Cleaning ephemeral test results, reports, debug artifacts, and temporary outputs..."
+	@rm -rf e2e/recordings/* e2e/playwright-report/* e2e/test-results/* e2e/*.png
+	@rm -rf backend/tmp/* frontend/dist/*
+	@rm -f on-call-engineer/incidents/inc-*.json
+	@echo "Clean complete!"
 
 obs-up:
 	@echo "Starting standalone observability stack (OTel Collector, Prometheus, Loki, Tempo, Grafana)..."
@@ -166,8 +175,8 @@ security-audit: security-scan oncall-verify
 	@echo "Deterministic security scan and operational resilience verification passed!"
 
 demo-record:
-	@echo "1. Pre-warming live observability data (Loki logs, Tempo traces, firing alerts)..."
-	@python3 e2e/demo/prewarm.py
+	@echo "1. Pre-warming live observability data via container..."
+	@docker run --rm --net=host -v $$(pwd):/app -w /app python:3.11-alpine python3 e2e/demo/prewarm.py
 	@echo "2. Recording Playwright architecture demo video in container..."
 	@docker compose run --rm e2e node demo/record.js
 	@echo "3. Multiplexing video with synchronized voice narration into WebM and MP4..."
@@ -233,10 +242,10 @@ ext-eval:
 	@evaluate-extension-pack
 
 ext-mcp-test:
-	@echo "Testing ChoreSync MCP server initialize..."
-	@echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}' | python3 mcp-server/server.py
-	@echo "Testing ChoreSync MCP server tools/list..."
-	@echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}' | python3 mcp-server/server.py
+	@echo "Testing ChoreSync MCP server initialize inside container..."
+	@echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}' | docker run --rm -i -v $$(pwd):/app -w /app python:3.11-alpine python3 mcp-server/server.py
+	@echo "Testing ChoreSync MCP server tools/list inside container..."
+	@echo '{"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}' | docker run --rm -i -v $$(pwd):/app -w /app python:3.11-alpine python3 mcp-server/server.py
 
 ext-capabilities:
 	@echo "Running Contract Audit Capability..."
@@ -257,8 +266,8 @@ mutation-test:
 	@run-mutation-test
 
 evals:
-	@echo "Running continuous agent & domain evaluation harness (Gate 15)..."
-	@python3 evals/eval_runner.py
+	@echo "Running continuous agent & domain evaluation harness inside container (Gate 15)..."
+	@docker run --rm -v $$(pwd):/app -w /app python:3.11-alpine python3 evals/eval_runner.py
 
 quality-reinforce: spec-drift mutation-test evals
 	@echo "All Gate 15 Quality Reinforcement checks passed successfully!"

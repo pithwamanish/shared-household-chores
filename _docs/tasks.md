@@ -138,7 +138,7 @@ Enforce the verification gate workflow: chores requiring approval transition to 
   - `backend/internal/handlers/completions.go`
   - `backend/internal/store/store.go`
   - `backend/tests/approval_test.go`
-  - `frontend/src/components/ApprovalQueueModal.tsx`
+  - `frontend/src/components/ApprovalQueueView.tsx`
 
 ## Subtasks
 - [x] Verify that completing a chore with `requires_approval: true` creates a completion with status `pending_approval`
