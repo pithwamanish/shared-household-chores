@@ -84,6 +84,11 @@ func (p *PostgresStore) Close() {
 	}
 }
 
+// Pool returns the underlying pgx connection pool (e.g. for Neon Queue service).
+func (p *PostgresStore) Pool() *pgxpool.Pool {
+	return p.pool
+}
+
 // ----------------- TYPE CONVERSION HELPERS -----------------
 
 func textToPg(s *string) pgtype.Text {

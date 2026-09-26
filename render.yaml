@@ -5,13 +5,12 @@
 # - Go Backend: Docker Web Service on Render Free Tier
 # - Database: Hosted Neon PostgreSQL (Serverless, 0.5 GB storage, SSL-enabled)
 # - Frontend: Docker Web Service with Caddy 2 Reverse Proxy or Render Static Site
+# - Cloud Object Storage / SQS: Cloudflare R2 / AWS S3 (or built-in mock fallback)
 # ==============================================================================
 
 services:
   # ----------------------------------------------------------------------------
   # 1. Go Backend Web Service (Statically-compiled Go 1.22 + sqlc + pgx)
-  #    Option A (Default): Git-backed Docker build
-  #    Option B (Pre-built Image): runtime: image, image: { url: ghcr.io/<org>/backend:prod-latest }
   # ----------------------------------------------------------------------------
   - type: web
     name: choresync-backend
@@ -25,17 +24,103 @@ services:
     envVars:
       - key: PORT
         value: 8000
+
       # Neon PostgreSQL Connection URL:
       # Format: postgresql://[user]:[password]@[neon-hostname]/neondb?sslmode=require
       - key: DATABASE_URL
         sync: false
+
+      # HMAC-SHA256 JWT Secret (Auto-generated 32+ character random string by Render)
       - key: JWT_SECRET
         generateValue: true
+
+      # Public Frontend Base URL (Used for Magic Links, Password Reset emails, and Invites)
+      # e.g., https://choresync-frontend.onrender.com
+      - key: APP_BASE_URL
+        sync: false
+
+      # ------------------------------------------------------------------------
+      # Transactional Email Providers
+      # Options: "mock" (default dev mailbox), "smtp" (Gmail/Mailtrap), "resend", "supabase"
+      # ------------------------------------------------------------------------
       - key: EMAIL_PROVIDER
         value: mock
+      - key: EMAIL_FROM
+        value: "ChoreSync <notifications@choresync.app>"
+      # Resend API Key (Optional: if EMAIL_PROVIDER=resend)
       - key: RESEND_API_KEY
         sync: false
+      # SMTP Configuration (Optional: if EMAIL_PROVIDER=smtp, e.g. Gmail App Password)
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      # Supabase Auth Configuration (Optional: if EMAIL_PROVIDER=supabase)
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+
+      # ------------------------------------------------------------------------
+      # Message Queue Provider (Chore reminder nudges & background workers)
+      # Options:
+      #   - "neon"     : ACID-safe PostgreSQL queue (Recommended: 0 extra accounts, uses DATABASE_URL)
+      #   - "sqs"      : AWS SQS or local Floci emulator
+      #   - "mock"     : In-memory mock queue
+      # ------------------------------------------------------------------------
+      - key: QUEUE_PROVIDER
+        value: neon
+
+      # ------------------------------------------------------------------------
+      # Photo Proof Storage Provider
+      # Options:
+      #   - "cloudinary" : Cloudinary image hosting (Recommended: 25GB free tier, CDN URLs)
+      #   - "s3"         : AWS S3 / Cloudflare R2 / MinIO / Floci
+      #   - "mock"       : In-memory mock storage
+      # ------------------------------------------------------------------------
+      - key: STORAGE_PROVIDER
+        value: cloudinary
+
+      # Cloudinary Configuration (Free 25GB/mo plan - https://cloudinary.com)
+      # You can provide the full CLOUDINARY_URL or individual keys below:
+      - key: CLOUDINARY_URL
+        sync: false # e.g. cloudinary://<api_key>:<api_secret>@<cloud_name>
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: CLOUDINARY_FOLDER
+        value: choresync/proofs
+
+      # ------------------------------------------------------------------------
+      # Alternative: AWS S3 / Cloudflare R2 / SQS (If STORAGE_PROVIDER=s3 or QUEUE_PROVIDER=sqs)
+      # ------------------------------------------------------------------------
+      - key: ENABLE_CLOUD_SERVICES
+        value: "false"
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_ENDPOINT_URL
+        sync: false # Omit for standard AWS, or set to Cloudflare R2 / MinIO endpoint
+      - key: S3_BUCKET_NAME
+        value: choresync-proofs
+      - key: SQS_QUEUE_NAME
+        value: choresync-reminders
+
+      # ------------------------------------------------------------------------
       # OpenTelemetry APM Configuration (Level 2 Observability)
+      # ------------------------------------------------------------------------
       - key: OTEL_SERVICE_NAME
         value: api-backend
       - key: DEPLOYMENT_ENVIRONMENT
@@ -62,6 +147,17 @@ services:
     envVars:
       - key: PORT
         value: 80
-      # Public HTTPS URL of the backend web service on Render Free Tier
+
+      # Public HTTPS URL of the backend web service on Render Free Tier.
+      # Render Free Tier web services communicate via their public URLs.
+      # Set this to your deployed backend URL: https://choresync-backend.onrender.com
       - key: BACKEND_URL
-        value: https://choresync-backend-euiz.onrender.com
+        sync: false
+
+      # Frontend OpenTelemetry / Reverse Proxy Telemetry Attributes
+      - key: OTEL_SERVICE_NAME
+        value: caddy-proxy
+      - key: DEPLOYMENT_ENVIRONMENT
+        value: production
+      - key: SERVICE_VERSION
+        value: prod-latest

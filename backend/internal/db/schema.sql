@@ -135,6 +135,22 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS reminder_jobs (
+    id TEXT PRIMARY KEY,
+    chore_id TEXT NOT NULL,
+    chore_title TEXT NOT NULL,
+    due_date TEXT NOT NULL DEFAULT '',
+    assignee_email TEXT NOT NULL DEFAULT '',
+    assignee_name TEXT NOT NULL DEFAULT '',
+    sender_name TEXT NOT NULL DEFAULT '',
+    household_name TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    attempts INTEGER NOT NULL DEFAULT 0,
+    last_error TEXT,
+    enqueued_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Indices for rapid lookup & foreign key query paths
 CREATE INDEX IF NOT EXISTS idx_members_household_id ON members(household_id);
 CREATE INDEX IF NOT EXISTS idx_chores_household_id ON chores(household_id);
@@ -147,4 +163,5 @@ CREATE INDEX IF NOT EXISTS idx_reward_redemptions_household_id ON reward_redempt
 CREATE INDEX IF NOT EXISTS idx_activity_logs_household_id ON activity_logs(household_id);
 CREATE INDEX IF NOT EXISTS idx_chore_comments_chore_id ON chore_comments(chore_id);
 CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_member_id ON password_reset_tokens(member_id);
+CREATE INDEX IF NOT EXISTS idx_reminder_jobs_status_enqueued ON reminder_jobs(status, enqueued_at);
 

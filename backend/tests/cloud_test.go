@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -229,5 +230,46 @@ func TestNudgeChoreWithSQSIntegration(t *testing.T) {
 	}
 	if queued[0].AssigneeEmail != "liam@example.com" {
 		t.Errorf("expected assignee email liam@example.com, got %s", queued[0].AssigneeEmail)
+	}
+}
+
+func TestCloudinaryConfigParsing(t *testing.T) {
+	os.Setenv("CLOUDINARY_URL", "cloudinary://123456789:abcdefghijk@my-cloud-name")
+	defer os.Unsetenv("CLOUDINARY_URL")
+
+	cfg := cloud.LoadCloudinaryConfigFromEnv()
+	if !cfg.Enabled {
+		t.Fatal("expected Cloudinary to be enabled when CLOUDINARY_URL is set")
+	}
+	if cfg.CloudName != "my-cloud-name" {
+		t.Errorf("expected CloudName 'my-cloud-name', got '%s'", cfg.CloudName)
+	}
+	if cfg.APIKey != "123456789" {
+		t.Errorf("expected APIKey '123456789', got '%s'", cfg.APIKey)
+	}
+	if cfg.APISecret != "abcdefghijk" {
+		t.Errorf("expected APISecret 'abcdefghijk', got '%s'", cfg.APISecret)
+	}
+	if cfg.Folder != "choresync/proofs" {
+		t.Errorf("expected default Folder 'choresync/proofs', got '%s'", cfg.Folder)
+	}
+}
+
+func TestCloudinaryServiceEnabled(t *testing.T) {
+	cfg := cloud.CloudinaryConfig{
+		CloudName: "test-cloud",
+		APIKey:    "test-key",
+		APISecret: "my_api_secret",
+		Folder:    "choresync/proofs",
+		Enabled:   true,
+	}
+	svc := cloud.NewCloudinaryStorageService(cfg)
+	if !svc.IsEnabled() {
+		t.Fatal("expected service to be enabled")
+	}
+
+	disabledSvc := cloud.NewCloudinaryStorageService(cloud.CloudinaryConfig{Enabled: false})
+	if disabledSvc.IsEnabled() {
+		t.Fatal("expected service to be disabled")
 	}
 }

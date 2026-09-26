@@ -1,9 +1,14 @@
 package tests
 
 import (
+	"context"
 	"os"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/choresync/backend/internal/cloud"
+	"github.com/choresync/backend/internal/email"
 	"github.com/choresync/backend/internal/models"
 	"github.com/choresync/backend/internal/store"
 )
@@ -82,5 +87,68 @@ func TestPostgresStoreIntegration(t *testing.T) {
 	_, err = pgStore.GetChore(createdChore.ID)
 	if err != store.ErrNotFound {
 		t.Errorf("Expected deleted test chore to return ErrNotFound after Reset(), got %v", err)
+	}
+}
+
+func TestPostgresQueueIntegration(t *testing.T) {
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		t.Skip("Skipping PostgreSQL integration test: DATABASE_URL not set")
+	}
+
+	pgStore, err := store.NewPostgresStore(dbURL)
+	if err != nil {
+		t.Fatalf("Failed to connect to PostgreSQL: %v", err)
+	}
+	defer pgStore.Close()
+
+	queue := cloud.NewPostgresQueueService(pgStore.Pool())
+	if !queue.IsEnabled() {
+		t.Fatal("expected PostgresQueueService to be enabled")
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mockEmail := email.NewMockService(email.Config{})
+	queue.StartReminderWorker(ctx, mockEmail)
+
+	job := cloud.ReminderJob{
+		ChoreID:       "c-dishes",
+		ChoreTitle:    "Clean Dishes (Postgres Queue Test)",
+		DueDate:       "tonight",
+		AssigneeEmail: "test-neon-queue@example.com",
+		AssigneeName:  "Test Roommate",
+		SenderName:    "Sarah Chen",
+		HouseholdName: "Oakwood Flatmates",
+	}
+
+	msgID, err := queue.PublishReminder(ctx, job)
+	if err != nil {
+		t.Fatalf("Failed to publish reminder to Neon Queue: %v", err)
+	}
+	if !strings.HasPrefix(msgID, "neon-job-") {
+		t.Errorf("expected msgID to start with 'neon-job-', got %s", msgID)
+	}
+
+	// Wait for background worker to consume job and invoke email
+	deadline := time.Now().Add(5 * time.Second)
+	found := false
+	for time.Now().Before(deadline) {
+		emails := mockEmail.GetRecentDevEmails()
+		for _, em := range emails {
+			if em.To == "test-neon-queue@example.com" {
+				found = true
+				break
+			}
+		}
+		if found {
+			break
+		}
+		time.Sleep(150 * time.Millisecond)
+	}
+
+	if !found {
+		t.Fatalf("Neon Queue background worker did not process job within deadline")
 	}
 }
