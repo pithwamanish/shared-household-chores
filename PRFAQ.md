@@ -24,7 +24,7 @@ Household chore imbalances remain one of the leading causes of domestic friction
 ChoreSync is designed for everyday accessibility. Its dual-mode interface operates seamlessly on shared kitchen tablets with 1-tap member switching and PIN-protected admin controls, as well as on private mobile devices.
 
 ### Availability & Deployment
-ChoreSync is fully open-source and deployable in seconds via lightweight Docker Compose clusters or local Kubernetes via Kind, running with zero compiler dependencies on the host OS. For more information, visit https://github.com/choresync/household-chores.
+ChoreSync is fully open-source and deployable in seconds via lightweight Docker Compose clusters or local Kubernetes via Kind, running with zero compiler dependencies on the host OS. For more information, visit https://github.com/pithwamanish/shared-household-chores.
 
 ---
 
