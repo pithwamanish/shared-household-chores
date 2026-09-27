@@ -18,7 +18,6 @@ permissions:
 env:
   APP_NAME: choresync
   KIND_CLUSTER_NAME: ${{ vars.KIND_CLUSTER_NAME || 'choresync-cluster' }}
-  KUBECONFIG: /root/.kube/config
 
 jobs:
   # ============================================================================
@@ -145,22 +144,51 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Configure Kubeconfig Environment
+        run: |
+          mkdir -p "${HOME}/.kube"
+          if [ "$(id -u)" -eq 0 ] && [ -f /root/.kube/config ] && [ -r /root/.kube/config ]; then
+            echo "Using /root/.kube/config (act root runner detected)"
+            echo "KUBECONFIG=/root/.kube/config" >> $GITHUB_ENV
+          else
+            echo "Using ${HOME}/.kube/config"
+            echo "KUBECONFIG=${HOME}/.kube/config" >> $GITHUB_ENV
+          fi
+
       - name: Ensure Kind and Kubectl CLI Tools
         run: |
           echo "==> Checking required CLI tools..."
+          mkdir -p "${HOME}/.local/bin"
+          echo "${HOME}/.local/bin" >> $GITHUB_PATH
+          export PATH="${HOME}/.local/bin:${PATH}"
+
           if ! command -v kubectl >/dev/null 2>&1; then
             echo "Installing kubectl..."
-            curl -fsSL -Lo /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
-            chmod +x /usr/local/bin/kubectl
+            curl -fsSL -Lo "${HOME}/.local/bin/kubectl" "https://dl.k8s.io/release/v1.30.0/bin/linux/amd64/kubectl"
+            chmod +x "${HOME}/.local/bin/kubectl"
           fi
 
           if ! command -v kind >/dev/null 2>&1; then
             echo "Installing kind..."
-            curl -fsSL -Lo /usr/local/bin/kind https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
-            chmod +x /usr/local/bin/kind
+            curl -fsSL -Lo "${HOME}/.local/bin/kind" https://kind.sigs.k8s.io/dl/v0.23.0/kind-linux-amd64
+            chmod +x "${HOME}/.local/bin/kind"
           fi
           kubectl version --client=true || true
           kind version || true
+
+      - name: Ensure Kind Cluster Exists
+        run: |
+          echo "==> Ensuring Kind cluster '${KIND_CLUSTER_NAME}' is active..."
+          if ! kind get clusters 2>/dev/null | grep -qx "${KIND_CLUSTER_NAME}"; then
+            echo "Kind cluster '${KIND_CLUSTER_NAME}' not found. Creating it..."
+            if [ -f "k8s/kind-cluster-config.yaml" ]; then
+              kind create cluster --name "${KIND_CLUSTER_NAME}" --config k8s/kind-cluster-config.yaml --wait 120s
+            else
+              kind create cluster --name "${KIND_CLUSTER_NAME}" --wait 120s
+            fi
+          else
+            echo "Kind cluster '${KIND_CLUSTER_NAME}' is already active."
+          fi
 
       - name: Verify Kind Cluster Connectivity
         run: |
@@ -168,6 +196,23 @@ jobs:
           KIND_CTX="kind-${KIND_CLUSTER_NAME}"
           kubectl cluster-info --context "${KIND_CTX}" || kubectl cluster-info
           kubectl get nodes --context "${KIND_CTX}" || kubectl get nodes
+
+      - name: Ensure Docker Images Built for Kind
+        run: |
+          IMAGE_TAG="${{ needs.build.outputs.image_tag }}"
+          if [ -z "${IMAGE_TAG}" ]; then
+            IMAGE_TAG=$(docker images --format '{{.Tag}}' choresync-frontend | grep -E '^[0-9]{8}-[0-9]{6}' | head -n 1)
+            [ -z "${IMAGE_TAG}" ] && IMAGE_TAG="dev-latest"
+          fi
+          echo "==> Verifying Docker images for tag: ${IMAGE_TAG}"
+          if ! docker image inspect "choresync-backend:${IMAGE_TAG}" >/dev/null 2>&1; then
+            echo "==> Building backend image on runner VM..."
+            docker build -t "choresync-backend:${IMAGE_TAG}" -t "choresync-backend:dev-latest" ./backend
+          fi
+          if ! docker image inspect "choresync-frontend:${IMAGE_TAG}" >/dev/null 2>&1; then
+            echo "==> Building frontend image on runner VM..."
+            docker build -f ./frontend/Dockerfile.prod -t "choresync-frontend:${IMAGE_TAG}" -t "choresync-frontend:dev-latest" ./frontend
+          fi
 
       - name: Load Unique Docker Images into Kind Cluster
         run: |
@@ -199,6 +244,9 @@ jobs:
       - name: Wait for Pod Rollout to Complete
         run: |
           KIND_CTX="kind-${KIND_CLUSTER_NAME}"
+          echo "==> Waiting for postgres rollout..."
+          kubectl rollout status deployment/postgres --context "${KIND_CTX}" --timeout=120s || true
+
           echo "==> Waiting for rollout of deployment/backend to finish (timeout: 120s)..."
           kubectl rollout status deployment/backend --context "${KIND_CTX}" --timeout=120s
 
