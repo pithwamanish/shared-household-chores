@@ -44,26 +44,26 @@ Managing shared household responsibilities frequently causes friction, uneven wo
 
 ```mermaid
 flowchart TD
-    A[Chore Created with Assignment Strategy] --> B{Assignment Mode}
-    B -->|Direct| C[Assigned to Specific Member]
-    B -->|Round-Robin| D[Auto-Assigned to Current In-Order Member]
-    B -->|Open Pool| E[Placed in Shared Household Pool]
+    A["Chore Created with Assignment Strategy"] --> B{"Assignment Mode"}
+    B -->|"Direct"| C["Assigned to Specific Member"]
+    B -->|"Round-Robin"| D["Auto-Assigned to Current In-Order Member"]
+    B -->|"Open Pool"| E["Placed in Shared Household Pool"]
 
-    E -->|Member Claims| C
-    C -->|Member Requests Swap| F[Swap Request Sent to Peer]
-    F -->|Peer Accepts| C
-    F -->|Peer Rejects| C
+    E -->|"Member Claims"| C
+    C -->|"Member Requests Swap"| F["Swap Request Sent to Peer"]
+    F -->|"Peer Accepts"| C
+    F -->|"Peer Rejects"| C
 
-    C -->|Member Submits Completion| G{Requires Approval?}
-    G -->|No (Instant Mode)| H[Mark Completed & Award Points]
-    G -->|Yes (Verification Mode)| I[Pending Approval + Optional Photo/Notes]
+    C -->|"Member Submits Completion"| G{"Requires Approval?"}
+    G -->|"No (Instant Mode)"| H["Mark Completed & Award Points"]
+    G -->|"Yes (Verification Mode)"| I["Pending Approval + Optional Photo/Notes"]
 
-    I -->|Admin Approves| H
-    I -->|Admin Rejects with Reason| C
+    I -->|"Admin Approves"| H
+    I -->|"Admin Rejects with Reason"| C
 
-    H --> J{Is Recurring?}
-    J -->|Yes| K[Spawn Next Recurrence Instance & Advance Round-Robin]
-    J -->|No| L[Chore Archived / Closed]
+    H --> J{"Is Recurring?"}
+    J -->|"Yes"| K["Spawn Next Recurrence Instance & Advance Round-Robin"]
+    J -->|"No"| L["Chore Archived / Closed"]
 ```
 
 ---
