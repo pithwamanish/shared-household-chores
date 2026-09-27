@@ -109,8 +109,9 @@ func (h *UploadHandler) GetPhoto(w http.ResponseWriter, r *http.Request) {
 	if key == "" {
 		key = chi.URLParam(r, "key")
 	}
-	if !strings.HasPrefix(key, "proofs/") {
-		key = "proofs/" + strings.TrimPrefix(key, "/")
+	key = strings.TrimPrefix(key, "/")
+	if !strings.HasPrefix(key, "proofs/") && !strings.HasPrefix(key, "choresync/") {
+		key = "proofs/" + key
 	}
 
 	contentType, reader, size, err := h.Storage.GetProofPhoto(r.Context(), key)
