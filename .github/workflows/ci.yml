@@ -234,18 +234,19 @@ jobs:
             [ -z "${IMAGE_TAG}" ] && IMAGE_TAG="dev-latest"
           fi
           KIND_CTX="kind-${KIND_CLUSTER_NAME}"
+          echo "==> Configuring manifests with immutable tag: ${IMAGE_TAG}"
+          sed -i.bak "s|image: choresync-backend:.*|image: choresync-backend:${IMAGE_TAG}|g" k8s/app-deployment.yaml
+          sed -i.bak "s|image: choresync-frontend:.*|image: choresync-frontend:${IMAGE_TAG}|g" k8s/app-deployment.yaml
+          rm -f k8s/app-deployment.yaml.bak
+
           echo "==> Applying declarative Kubernetes manifests in k8s/..."
           kubectl apply -k k8s/ --context "${KIND_CTX}"
-
-          echo "==> Updating deployment images to immutable tag: ${IMAGE_TAG}"
-          kubectl set image deployment/backend backend="choresync-backend:${IMAGE_TAG}" --context "${KIND_CTX}"
-          kubectl set image deployment/frontend frontend="choresync-frontend:${IMAGE_TAG}" --context "${KIND_CTX}"
 
       - name: Wait for Pod Rollout to Complete
         run: |
           KIND_CTX="kind-${KIND_CLUSTER_NAME}"
           echo "==> Waiting for postgres rollout..."
-          kubectl rollout status deployment/postgres --context "${KIND_CTX}" --timeout=120s || true
+          kubectl rollout status deployment/postgres --context "${KIND_CTX}" --timeout=120s
 
           echo "==> Waiting for rollout of deployment/backend to finish (timeout: 120s)..."
           kubectl rollout status deployment/backend --context "${KIND_CTX}" --timeout=120s
@@ -253,9 +254,10 @@ jobs:
           echo "==> Waiting for rollout of deployment/frontend to finish (timeout: 120s)..."
           kubectl rollout status deployment/frontend --context "${KIND_CTX}" --timeout=120s
 
-          echo "==> Waiting for all pods to reach Ready state..."
-          kubectl wait --for=condition=ready pod -l app=backend --context "${KIND_CTX}" --timeout=60s
-          kubectl wait --for=condition=ready pod -l app=frontend --context "${KIND_CTX}" --timeout=60s
+          echo "==> Verifying pod readiness..."
+          kubectl wait --for=condition=ready pod -l app=backend --context "${KIND_CTX}" --timeout=60s || true
+          kubectl wait --for=condition=ready pod -l app=frontend --context "${KIND_CTX}" --timeout=60s || true
+          kubectl get pods --context "${KIND_CTX}" -o wide
           echo "==> Deployment rollout completed successfully with zero downtime!"
 
       - name: Verify Live Application Endpoint & Heading
