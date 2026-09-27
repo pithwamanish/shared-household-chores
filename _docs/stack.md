@@ -16,16 +16,16 @@ Per the user's architectural selection in Step 6, the backend will be implemente
 
 ## 2. Architecture Comparison Matrix
 
-| Dimension | Option 1: Golang + Chi / Koyeb (Confirmed) | Option 2: Go on Serverless (Cloud Run) | Option 3: TypeScript / Node PaaS |
+| Dimension | Option 1: Golang + Chi / Render + Neon (Confirmed) | Option 2: Go on Serverless (Cloud Run) | Option 3: TypeScript / Node PaaS (Rejected) |
 | :--- | :--- | :--- | :--- |
 | **Target Runtime** | **Golang 1.22+ + Chi (`go-chi/chi/v5`)** | **Golang 1.22+ (Cloud Run Container)** | Node.js 22 (TypeScript) + Express |
-| **Compute Hosting** | **Koyeb** (Free Eco) or **Fly.io** | **GCP Cloud Run** (2M free req/mo) | Render / Koyeb |
+| **Compute Hosting** | **Render Free Web Service** | **GCP Cloud Run** (2M free req/mo) | Render Free Web Service |
 | **Database** | **In-Memory** (Step 7) → **Neon Postgres** (`sqlc` + `pgx`) | **In-Memory** → **Neon Postgres** | In-Memory → Neon Postgres (Prisma) |
-| **Observability** | **BetterStack** (Free Uptime & Logs) or **HyperDX** | **Google Cloud Logging** or **Grafana Cloud** | BetterStack / HyperDX |
+| **Observability** | **OpenTelemetry LGTM Stack** (Collector/Loki/Tempo/Prometheus) | **Google Cloud Logging** or **Grafana Cloud** | Third-party SaaS |
 | **RAM Footprint** | **~15–25 MB** (95% free headroom on 512MB) | **~15–25 MB** (Fits comfortably in 128MB tier) | ~80–120 MB |
-| **Cold Start** | 0s on Koyeb; **<50ms** on spin-up | **<100ms** container boot | ~1–3s on Cloud Run; ~40s on Render |
+| **Cold Start** | **<50ms** native binary boot | **<100ms** container boot | ~40s on sleep wakeup |
 | **Monthly Cost** | **$0.00 / month** | **$0.00 / month** | **$0.00 / month** |
-| **Image Size** | **~15–25 MB** (Multi-stage `scratch`/`alpine`) | **~15–25 MB** | ~150–250 MB |
+| **Image Size** | **~15–25 MB** (Multi-stage `alpine`) | **~15–25 MB** | ~150–250 MB |
 
 ---
 
@@ -44,7 +44,7 @@ Per the user's architectural selection in Step 6, the backend will be implemente
    - Complete support for all 26 endpoints with seed test fixtures matching [`_docs/manual-test.md`](_docs/manual-test.md).
    - Instant unit test execution (<0.2s for entire test suite via `go test ./...`).
 2. **Production Deployment**:
-   - **`sqlc` + `pgx/v5`**: Compile-time type-safe SQL query generation for **Neon Serverless Postgres** (or pure Go `modernc.org/sqlite` without CGO).
+   - **`sqlc` + `pgx/v5`**: Compile-time type-safe SQL query generation for **Neon Serverless Postgres** (PostgreSQL 16).
    - Zero reflection overhead, optimal query performance, and compile-time verification of SQL queries against schema migrations.
 
 ---
@@ -54,8 +54,8 @@ Per the user's architectural selection in Step 6, the backend will be implemente
 | Failure Mode / Constraint | Affected Option | Impact | Prevention / Mitigation Strategy |
 | :--- | :--- | :--- | :--- |
 | **RAM Exhaustion** | Node/Python stacks | Container OOM killed on 512MB tiers | **Eliminated by Golang**: Go process consumes ~15–25MB, leaving >90% headroom. |
-| **Cold Start Delays** | PaaS containers on sleep | 30–50s delay on first request | Go compiles to native binary; boots in <50ms. Koyeb Eco instance prevents sleeping altogether. |
-| **Database Connection Spikes** | Postgres on serverless | Exhausts connection limit | Use Neon's pooled connection string (`?sslmode=require`) and configure `pgxpool.Config{MaxConns: 5}`. |
+| **Cold Start Delays** | PaaS containers on sleep | 30–50s delay on first request | Go compiles to native binary; boots in <50ms. Fast health checks at `/healthz`. |
+| **Database Connection Spikes** | Postgres on serverless | Exhausts connection limit | Use Neon's pooled connection string (`?sslmode=require`) and configure `pgxpool.Config{MaxConns: 10, MinConns: 2}`. |
 | **Contract Drift** | Hand-crafted models | API changes break client | Run `oapi-codegen` against `contracts/openapi.yaml` during CI/CD to verify Go interfaces. |
 
 ---
@@ -65,12 +65,16 @@ Per the user's architectural selection in Step 6, the backend will be implemente
 1. **Language & Runtime**: **Golang (Go 1.22+)**
 2. **HTTP Routing**: **Chi (`go-chi/chi/v5`)** conforming to `contracts/openapi.yaml`
 3. **Persistence**:
-   - **Step 7**: Thread-safe in-memory repository (`sync.RWMutex`)
-   - **Production**: Neon Serverless Postgres via `sqlc` + `pgx/v5`
-4. **Cloud Target**:
-   - Frontend: **Vercel / Cloudflare Pages** (Free CDN edge)
-   - Backend: **Koyeb Free Eco** (512MB RAM, always active) or **GCP Cloud Run** (scale-to-zero)
-   - Observability: **BetterStack** uptime monitor + `/healthz` endpoint
+   - **Local / Test Harness**: Thread-safe in-memory repository (`sync.RWMutex`)
+   - **Production & Integration**: Hosted Neon Serverless Postgres (PostgreSQL 16) via `sqlc` + `pgx/v5`
+4. **Cloud & Infrastructure Target**:
+   - **Frontend**: **Render Docker Web Service** (with Caddy 2 reverse proxy) or **Render Static Site**
+   - **Backend**: **Render Free Tier Web Service** via [`render.yaml`](../render.yaml)
+   - **Photo Storage**: **Cloudinary** (25GB/mo free CDN plan) with AWS S3 / Floci fallback
+   - **Message Queue**: **Neon PostgreSQL Queue** (`reminder_jobs` via `FOR UPDATE SKIP LOCKED`) with AWS SQS / Floci fallback
+   - **Observability**: **Standalone LGTM Stack** (OpenTelemetry Collector, Prometheus, Loki, Tempo, Grafana) + `/healthz` health checks
+5. **Local Cloud Emulator**:
+   - **Floci (`floci/floci:latest`)** on port 4566 for local S3 and SQS emulation with zero host runtimes.
 
 ---
 
@@ -127,4 +131,16 @@ The application uses official **AWS SDK for Go v2** (`github.com/aws/aws-sdk-go-
 ### 7.4 Common Orchestration Layer
 - **Docker Compose**: Orchestrated via `choresync-floci` service on port `4566` in `docker-compose.yml`, `docker-compose.prod.yml`, and `docker-compose.deploy.yml`.
 - **Kubernetes (`k8s/`)**: Declarative manifests in `k8s/floci-deployment.yaml` and `k8s/floci-service.yaml`, bundled via `k8s/kustomization.yaml` and injected via `k8s/configmap.yaml`.
+
+---
+
+## 8. Multi-Provider Cloud Storage & Message Queue Resolution
+
+ChoreSync supports configurable storage and queue providers with zero code modifications, resolved via environment variables:
+
+| Provider Role | Default Production Provider | Local Dev / CI Provider | Configuration Keys |
+| :--- | :--- | :--- | :--- |
+| **Photo Storage** | **Cloudinary** (25GB/mo free CDN) | **Floci S3** (`choresync-proofs` bucket) | `STORAGE_PROVIDER=cloudinary` (`CLOUDINARY_URL`) or `STORAGE_PROVIDER=s3` (`AWS_ENDPOINT_URL`, `S3_BUCKET_NAME`) |
+| **Message Queue** | **Neon PostgreSQL Queue** (ACID `FOR UPDATE SKIP LOCKED`) | **Floci SQS** (`choresync-reminders` queue) | `QUEUE_PROVIDER=neon` (uses existing `DATABASE_URL`) or `QUEUE_PROVIDER=sqs` (`AWS_ENDPOINT_URL`, `SQS_QUEUE_NAME`) |
+| **Transactional Email** | **Resend** (3,000 free emails/mo) | **In-Memory Dev Mailbox** (`mock`) | `EMAIL_PROVIDER=resend` (`RESEND_API_KEY`) or `EMAIL_PROVIDER=mock` |
 

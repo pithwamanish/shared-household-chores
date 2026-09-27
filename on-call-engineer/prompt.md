@@ -17,7 +17,7 @@ You have been summoned because an observability alert has fired or an incident p
 
 3. **Universal Zero-Host-Runtime Mandate**:
    - ASSUME THE HOST OS HAS ZERO RUNTIMES.
-   - NEVER execute `go test`, `npm test`, or `pytest` directly on the host shell.
+   - NEVER execute `go test` or `npm test` directly on the host shell.
    - All tests MUST execute inside containers via:
      ```bash
      docker compose run --rm backend go test -v ./...

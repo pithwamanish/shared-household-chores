@@ -66,7 +66,7 @@ ChoreSync enforces a strict **Zero-Host-Runtime Mandate**: all services, databas
 ### Core Technologies
 - **Frontend**: React 18, Vite, TypeScript, Tailwind CSS, Lucide icons, centralized API client ([`frontend/src/services/api.ts`](frontend/src/services/api.ts)), segmented Kitchen Tablet vs. Personal Device toggle.
 - **Backend API**: Go 1.22+, Chi HTTP router, `sqlc` + `pgx/v5` for type-safe database queries, embedded auto-migrations, transactional email notifications (Resend / SMTP / Dev Mailbox).
-- **Local Cloud Emulator**: **Floci** (`floci/floci:latest`, port 4566) providing 100% cloud parity for AWS S3 (chore completion photo proofs) and AWS SQS (decoupled reminder nudge queueing with background worker). Zero code forking via official AWS Go SDK v2.
+- **Storage & Queues**: Multi-provider architecture with **Cloudinary** (photo proof CDN) and **Neon PostgreSQL Queue** (`FOR UPDATE SKIP LOCKED`) in production, with **Floci** (`floci/floci:latest`, port 4566) providing local offline parity for AWS S3 and SQS. Zero code forking via official AWS Go SDK v2.
 - **Database**: PostgreSQL 16 with persistent volume storage, relational DDL schema across 11 tables, and automated seed fixtures.
 - **Reverse Proxy**: Caddy 2 with gzip/zstd compression, security headers, SPA fallback routing, and zero-CORS API proxying.
 - **Observability**: Full-stack OpenTelemetry instrumentation with W3C distributed trace propagation across React SPA $\rightarrow$ Caddy $\rightarrow$ Go Backend $\rightarrow$ PostgreSQL (`pgx.QueryTracer`). Decoupled standalone LGTM stack (OTel Collector, Prometheus, Loki, Tempo, Grafana).
@@ -147,7 +147,7 @@ docker compose ps
 ```
 - **Web App**: http://localhost:3000
 - **Floci Cloud Emulator**: http://localhost:4566
-- **Backend API**: http://localhost:8080/api/v1/healthz
+- **Backend API**: http://localhost:8000/healthz
 
 ### 2. Run Test Suites Inside Containers
 ```bash

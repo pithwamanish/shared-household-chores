@@ -1,6 +1,9 @@
 # ChoreSync Task Backlog (`_docs/tasks.md`)
 
-This document tracks all implementation, testing, and infrastructure tasks for **ChoreSync** during **Step 8: Multi-Agent Task Orchestration**.
+> [!NOTE]
+> **Status: [HISTORICAL / ALL COMPLETED - Step 8 Multi-Agent Task Backlog]**  
+> This backlog document records the initial Step 8 development tasks (TASK-001 through TASK-006). All tasks have been implemented, verified, and merged into `main`.  
+> **Current Project State**: For overall lifecycle progression, see [`_docs/state.md`](state.md). For new task templates, see [`_docs/task-template.md`](task-template.md).
 
 ---
 
@@ -78,7 +81,7 @@ Connect the React frontend service layer (`frontend/src/services/api.ts`) to the
 - [x] Connect `getHouseholds()`, `getHousehold(id)`, `getMembers(householdId)`, and `getChores(householdId)` to live backend endpoints
 - [x] Implement seamless fallback to local seed data if backend is unreachable or offline
 - [x] Add unit tests verifying request/response envelope handling and error transformation
-- [x] Run linter and typecheck (`bun run lint` / `npm run typecheck`)
+- [x] Run linter and typecheck (`npm run lint` / `npm run typecheck`)
 
 ## Acceptance Criteria
 - [x] Frontend successfully fetches live data from Go backend when running

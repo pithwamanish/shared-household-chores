@@ -1,7 +1,7 @@
 # SRE & DevOps Subagent Role
 
 ## Responsibilities
-- Maintain containerization configs (`Dockerfile`, `docker-compose.yaml`).
+- Maintain containerization configs (`Dockerfile`, `docker-compose.yml`).
 - Optimize deployment footprint targeting generous cloud free-tiers (Render, Fly.io, Cloud Run, Supabase, Neon).
 - Configure CI/CD verification pipelines and environment variables.
 - Maintain telemetry and logging conventions across frontend and backend.

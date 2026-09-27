@@ -169,8 +169,8 @@ When executing multi-agent workflows, agents adopt the following roles:
 
 Before any task or pull request is declared complete, it must pass the following verification gates:
 1. **Contract Check**: Zero drift between `contracts/openapi.yaml` and implementation.
-2. **Lint & Typecheck**: No TypeScript or linter errors (`bun run lint` or `npm run typecheck`).
-3. **Unit Tests**: All unit test suites pass (`npm test` / `pytest`).
+2. **Lint & Typecheck**: No TypeScript or linter errors (`npm run lint` or `npm run typecheck`).
+3. **Unit Tests**: All unit test suites pass (Go: `go test ./...` / Frontend: `npm test`).
 4. **End-to-End**: User verification journey passes without regression (`_docs/manual-test.md`).
 
 ---

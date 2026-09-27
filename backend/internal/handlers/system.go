@@ -24,7 +24,7 @@ func (h *SystemHandler) ResetDemoData(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HealthCheck provides uptime status for Koyeb/BetterStack monitoring.
+// HealthCheck provides uptime status for platform health probes and observability monitoring.
 func (h *SystemHandler) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, map[string]string{
 		"status":  "healthy",

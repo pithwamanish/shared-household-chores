@@ -42,6 +42,8 @@ This guide provides complete instructions for deploying **ChoreSync** to a gener
 | :--- | :--- | :--- | :--- |
 | **Go Backend** | Render Free Web Service | **$0/mo** | 512 MB RAM, 0.1 CPU. Sleeps after 15 min inactivity (~30s cold start on wake). |
 | **Relational DB** | Neon Serverless Postgres | **$0/mo** | 0.5 GB storage, serverless autoscaling, scale-to-zero compute. |
+| **Photo Proof Storage**| Cloudinary Free Tier (or S3/Floci) | **$0/mo** | 25 GB/month bandwidth and storage with global CDN. |
+| **Background Queue** | Neon PostgreSQL Queue (or SQS/Floci) | **$0/mo** | ACID `FOR UPDATE SKIP LOCKED` worker utilizing existing database connection. |
 | **Frontend & Proxy** | Render Free Docker Web Service (or Static Site) | **$0/mo** | Fast Caddy 2 reverse proxy with HTTP/2 & HTTP/3. |
 | **Email Service** | Resend Free Tier (or In-Memory Dev Outbox) | **$0/mo** | 3,000 emails/month (100 emails/day) with custom domain. |
 
@@ -83,6 +85,8 @@ ChoreSync includes a canonical Render Blueprint configuration in [`render.yaml`]
      - `choresync-frontend`
    - When prompted for **`DATABASE_URL`**, paste your Neon connection string (`postgresql://...sslmode=require`).
    - `JWT_SECRET` is automatically generated with a secure random key.
+   - `STORAGE_PROVIDER` defaults to `cloudinary` (supply `CLOUDINARY_URL` or API keys from Cloudinary dashboard) or falls back to `mock`.
+   - `QUEUE_PROVIDER` defaults to `neon` (ACID-safe background job queue reusing `DATABASE_URL` with zero extra setup).
    - If using real email dispatch, set `EMAIL_PROVIDER=resend` and enter your `RESEND_API_KEY`. Otherwise, leave default `EMAIL_PROVIDER=mock`.
 4. **Deploy**:
    - Click **"Apply"**. Render will build both Docker images and launch the services.
