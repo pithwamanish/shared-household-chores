@@ -1,0 +1,18 @@
+{
+  "incident_id": "INC-20260928-001",
+  "alert_name": "HighHttpErrorRate",
+  "root_cause_analysis": {
+    "summary": "Nil pointer dereference in chores handler introduced in commit 7f3a9b1 when evaluating family household filter without checking nil pointer on query parameter struct.",
+    "failing_component": "backend/internal/handlers/chores.go:ListChores",
+    "suspected_commit": "7f3a9b1",
+    "confidence": "high"
+  },
+  "proposed_action": "rollback",
+  "command": "bash incident-response/runbooks/rollback.sh",
+  "reproduction_test": "docker run --rm -v $(pwd)/backend:/app -w /app golang:1.22-alpine go test -run TestListChores_NilFilter ./tests/...",
+  "safety_assessment": {
+    "reversible": true,
+    "blast_radius": "backend microservice deployment (zero database state changes)"
+  },
+  "required_autonomy_level": "LEVEL_1_AUTO_EXECUTE"
+}

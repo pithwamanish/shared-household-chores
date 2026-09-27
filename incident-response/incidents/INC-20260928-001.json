@@ -1,0 +1,23 @@
+{
+  "alert": {
+    "name": "HighHttpErrorRate",
+    "state": "firing",
+    "severity": "critical"
+  },
+  "service": {
+    "name": "api-backend",
+    "version": "dev-latest"
+  },
+  "deployment": {
+    "environment": "development"
+  },
+  "metric": {
+    "name": "http_requests_total",
+    "observed_value": 38.46,
+    "threshold": 5.0,
+    "duration": "1m"
+  },
+  "dashboard_url": "http://localhost:3001/d/overview?var-environment=development&var-version=dev-latest",
+  "runbook_url": "incident-response/runbooks/rollback.sh",
+  "timestamp": "2026-09-28T01:10:00Z"
+}

@@ -1,0 +1,75 @@
+# OpenTelemetry Collector Configuration for ChoreSync
+# Receives telemetry via OTLP (gRPC / HTTP), batches and exports to:
+# - Prometheus: metrics (scraped at :8889)
+# - Grafana Loki: structured logs (:3100)
+# - Grafana Tempo: distributed traces (:4317)
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost:3000"
+            - "http://localhost:3001"
+            - "http://localhost:5173"
+            - "http://localhost:8088"
+            - "http://localhost:8000"
+            - "http://127.0.0.1:3000"
+            - "http://127.0.0.1:3001"
+            - "http://127.0.0.1:8088"
+          allowed_headers:
+            - "*"
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 20
+  batch:
+    timeout: 1s
+    send_batch_size: 256
+
+exporters:
+  # Traces -> Grafana Tempo
+  otlp/tempo:
+    endpoint: "tempo:4317"
+    tls:
+      insecure: true
+
+  # Metrics -> Prometheus Scrape Target
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Logs -> Grafana Loki Push API
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+
+  # Debug exporter for pipeline inspection
+  debug:
+    verbosity: detailed
+
+service:
+  telemetry:
+    logs:
+      level: "info"
+    metrics:
+      address: "0.0.0.0:8888"
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo, debug]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheus, debug]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [loki, debug]

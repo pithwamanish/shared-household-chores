@@ -1,0 +1,23 @@
+{
+  "timestamp": "2026-09-28T01:12:00Z",
+  "incident_id": "INC-20260928-001",
+  "target_probe_url": "http://localhost:8000/healthz",
+  "probe_http_status": 200,
+  "endpoints_verified": [
+    {
+      "path": "/healthz",
+      "status": 200,
+      "latency_ms": 3.2
+    },
+    {
+      "path": "/api/v1/chores",
+      "status": 200,
+      "latency_ms": 14.5
+    }
+  ],
+  "current_5xx_error_rate_pct": 0.0,
+  "alert_threshold_breached": false,
+  "prometheus_alert_state": "RESOLVED",
+  "verdict": "VERIFIED_RECOVERED",
+  "verified_by": "incident-response/runbooks/verify-recovery.sh"
+}

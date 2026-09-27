@@ -1,0 +1,21 @@
+{
+  "policy_evaluation_id": "POL-20260928-011030",
+  "incident_id": "INC-20260928-001",
+  "timestamp": "2026-09-28T01:10:30Z",
+  "action_evaluated": "rollback",
+  "command_evaluated": "bash incident-response/runbooks/rollback.sh",
+  "model_confidence": "high",
+  "policy_engine_verdict": "APPROVED",
+  "resolved_autonomy_level": "LEVEL_1_AUTO_EXECUTE",
+  "policy_checks": {
+    "command_in_allowlist": true,
+    "forbidden_patterns_clean": true,
+    "execution_cap_within_bounds": true,
+    "requires_human_confirmation": false
+  },
+  "authorized_execution": {
+    "command": "bash incident-response/runbooks/rollback.sh",
+    "executed_at": "2026-09-28T01:10:32Z",
+    "execution_exit_code": 0
+  }
+}

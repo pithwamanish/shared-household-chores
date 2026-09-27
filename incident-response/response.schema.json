@@ -1,0 +1,82 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OnCallResponderStructuredOutput",
+  "description": "Vendor-neutral structured output schema for headless AI incident responders (Codex / Claude Code).",
+  "type": "object",
+  "required": [
+    "incident_id",
+    "alert_name",
+    "root_cause_analysis",
+    "proposed_action",
+    "command",
+    "reproduction_test",
+    "safety_assessment",
+    "required_autonomy_level"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "description": "Unique incident identifier (e.g. INC-20260928-001)"
+    },
+    "alert_name": {
+      "type": "string",
+      "description": "Name of the firing Prometheus alert"
+    },
+    "root_cause_analysis": {
+      "type": "object",
+      "required": ["summary", "failing_component", "suspected_commit", "confidence"],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "description": "Concise summary of the root cause identified from bounded evidence."
+        },
+        "failing_component": {
+          "type": "string",
+          "description": "Specific microservice, package, handler, or endpoint that failed."
+        },
+        "suspected_commit": {
+          "type": "string",
+          "description": "Git commit SHA suspected of introducing the regression."
+        },
+        "confidence": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "description": "Model confidence level in the diagnosis."
+        }
+      }
+    },
+    "proposed_action": {
+      "type": "string",
+      "enum": ["rollback", "restart_service", "apply_patch", "scale_deployment", "escalate"],
+      "description": "Action proposed by the model to restore system health."
+    },
+    "command": {
+      "type": "string",
+      "description": "Exact concrete shell or operational command proposed."
+    },
+    "reproduction_test": {
+      "type": "string",
+      "description": "Automated regression test command or code reproducing the failure before remediation."
+    },
+    "safety_assessment": {
+      "type": "object",
+      "required": ["reversible", "blast_radius"],
+      "properties": {
+        "reversible": {
+          "type": "boolean",
+          "description": "Whether the proposed action can be safely reverted without state loss."
+        },
+        "blast_radius": {
+          "type": "string",
+          "description": "Scope of impact (e.g., single service, container restart, full cluster)."
+        }
+      }
+    },
+    "required_autonomy_level": {
+      "type": "string",
+      "enum": ["LEVEL_1_AUTO_EXECUTE", "LEVEL_2_HUMAN_APPROVAL", "LEVEL_3_ESCALATE"],
+      "description": "Autonomy tier required to execute this action under autonomy-policy.yaml."
+    }
+  },
+  "additionalProperties": false
+}

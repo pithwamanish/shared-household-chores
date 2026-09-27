@@ -1,0 +1,12 @@
+{
+  "scan_id": "SCAN-20260928-001",
+  "timestamp": "2026-09-28T01:25:00Z",
+  "scanner": "Semgrep OSS 1.177.0 via returntocorp/semgrep",
+  "total_files_scanned": 85,
+  "summary": {
+    "critical_count": 0,
+    "warning_count": 0,
+    "info_count": 0
+  },
+  "findings": []
+}

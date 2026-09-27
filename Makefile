@@ -1,4 +1,4 @@
-.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities spec-drift mutation-test evals quality-reinforce ai-docs repo-verify
+.PHONY: compat setup dev test lint e2e compose-up compose-down obs-up obs-down obs-logs verify clean prod-build prod-up prod-down ci-local docker-build-tag build-image deploy-dev deploy deploy-down promote-prod oncall-verify oncall-test oncall-drill oncall-evidence oncall-policy-check security-scan security-audit incident-evidence incident-rollback incident-verify ops-report demo-record demo-view k8s-cluster k8s-build k8s-load k8s-deploy k8s-wait k8s-verify k8s-up k8s-down k8s-logs ext-verify ext-eval ext-mcp-test ext-capabilities spec-drift mutation-test evals quality-reinforce ai-docs repo-verify
 
 compat:
 	@echo "Linking agent tool conventions (Claude, Cursor, Antigravity, Copilot, Windsurf)..."
@@ -22,6 +22,11 @@ compat:
 	@ln -sfn custom-agent .bmad 2>/dev/null || true
 	@ln -sfn skills agent-capabilities 2>/dev/null || true
 	@ln -sfn com.antigravity.client/hooks agent-hooks 2>/dev/null || true
+	@mkdir -p plugins && ln -sfn .. plugins/ai-devtools-agent-pack 2>/dev/null || true
+	@ln -sf ../docs/demo.md _docs/demo.md 2>/dev/null || true
+	@ln -sfn contract-audit skills/review-api-change 2>/dev/null || true
+	@ln -sfn cluster-health-prober skills/debug-ci-failure 2>/dev/null || true
+	@ln -sfn ../custom-agent skills/subagents 2>/dev/null || true
 	@echo "Compatibility bridges active!"
 
 setup: compat
@@ -173,6 +178,23 @@ security-scan:
 
 security-audit: security-scan oncall-verify
 	@echo "Deterministic security scan and operational resilience verification passed!"
+
+incident-evidence:
+	@echo "Collecting bounded read-only evidence packet via incident-response/collect-evidence.sh..."
+	@bash incident-response/collect-evidence.sh
+
+incident-rollback:
+	@echo "Executing Level 1 operational rollback via incident-response/runbooks/rollback.sh..."
+	@bash incident-response/runbooks/rollback.sh backend
+
+incident-verify:
+	@echo "Verifying post-remediation system recovery via incident-response/runbooks/verify-recovery.sh..."
+	@bash incident-response/runbooks/verify-recovery.sh
+
+ops-report:
+	@echo "Viewing operations and security report..."
+	@head -n 40 docs/operations-and-security-report.md
+
 
 demo-record:
 	@echo "1. Pre-warming live observability data via container..."

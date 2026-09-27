@@ -1,0 +1,89 @@
+groups:
+  - name: choresync-critical-alerts
+    rules:
+      - alert: HighHttpErrorRate
+        expr: |
+          (
+            sum(rate({__name__=~"(choresync_)?http_requests_total", http_status_code=~"5.."}[1m]))
+            /
+            clamp_min(sum(rate({__name__=~"(choresync_)?http_requests_total"}[1m])), 0.001)
+          ) * 100 > 5
+        for: 30s
+        labels:
+          severity: critical
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "Elevated HTTP 5xx error rate on {{ $labels.service }}"
+          description: "Service {{ $labels.service }} in {{ $labels.environment }} is experiencing a 5xx error rate of {{ $value | printf \"%.2f\" }}% (threshold: 5%)."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "incident-response/runbooks/rollback.sh"
+
+      - alert: HighRequestLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate({__name__=~"(choresync_)?http_server_request_duration_seconds_bucket"}[1m])) by (le)) > 1.0
+        for: 1m
+        labels:
+          severity: warning
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "High P95 request latency on {{ $labels.service }}"
+          description: "P95 latency on {{ $labels.service }} in {{ $labels.environment }} is {{ $value | printf \"%.2f\" }}s (threshold: 1.0s)."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "incident-response/runbooks/rollback.sh"
+
+      - alert: DatabaseQueryErrors
+        expr: |
+          sum(rate({__name__=~"(choresync_)?db_query_errors_total"}[1m])) > 0.05
+        for: 30s
+        labels:
+          severity: critical
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "Database query errors on {{ $labels.service }}"
+          description: "Database queries are failing on {{ $labels.service }} in {{ $labels.environment }} at rate {{ $value | printf \"%.2f\" }} errors/sec."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "incident-response/runbooks/rollback.sh"
+
+      - alert: ServiceTargetDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: backend-team
+        annotations:
+          summary: "Target instance is down on {{ $labels.instance }}"
+          description: "Instance {{ $labels.instance }} of job {{ $labels.job }} is unreachable."
+          dashboard_url: "http://localhost:3001/d/overview?var-environment={{ $labels.environment }}&var-version={{ $labels.version }}"
+          runbook_url: "incident-response/runbooks/rollback.sh"
+
+      - alert: HighChoreRejectionRate
+        expr: |
+          (
+            sum(rate({__name__=~"(choresync_)?chore_approvals_total", approval_decision="rejected"}[5m]))
+            /
+            clamp_min(sum(rate({__name__=~"(choresync_)?chore_approvals_total"}[5m])), 0.001)
+          ) * 100 > 50
+        for: 2m
+        labels:
+          severity: warning
+          service: api-backend
+          environment: development
+          version: dev-latest
+          owner: product-team
+        annotations:
+          summary: "Elevated chore rejection rate on {{ $labels.service }}"
+          description: "Over 50% of chore approvals are being rejected in {{ $labels.environment }}."
+          dashboard_url: "http://localhost:3001/d/choresync-apm"
+          runbook_url: "incident-response/runbooks/rollback.sh"

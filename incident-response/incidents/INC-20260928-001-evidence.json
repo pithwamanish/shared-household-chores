@@ -1,0 +1,50 @@
+{
+  "incident_id": "INC-20260928-001",
+  "timestamp": "2026-09-28T01:10:15Z",
+  "service": {
+    "name": "api-backend",
+    "deployed_version": "7f3a9b1",
+    "branch": "main",
+    "environment": "development"
+  },
+  "metrics": {
+    "http_5xx_error_rate_pct": 38.46,
+    "p95_latency_seconds": 2.45,
+    "alert_threshold_breached": true
+  },
+  "runtime_status": {
+    "containers": [
+      {
+        "name": "choresync-backend",
+        "status": "Up 4 minutes",
+        "image": "ghcr.io/pithwamanish/household-chores/backend:20260928-010000-7f3a9b1"
+      }
+    ]
+  },
+  "git_evidence": {
+    "head_commit": "7f3a9b1",
+    "recent_commits": [
+      {
+        "sha": "7f3a9b1",
+        "author": "SWE Agent",
+        "date": "2026-09-28 01:02:14 +0000",
+        "message": "feat(chores): add filter query optimizer for family households"
+      },
+      {
+        "sha": "4d1f148",
+        "author": "Lead Maintainer",
+        "date": "2026-09-27 22:15:30 +0000",
+        "message": "feat(eval): formalize Gate 14 Agent Extension Pack Conformance Evaluation (100% COMPLIANT)"
+      }
+    ]
+  },
+  "log_evidence": [
+    "level=error ts=2026-09-28T01:09:42Z caller=chores.go:142 msg=\"runtime error: invalid memory address or nil pointer dereference\" path=/api/v1/chores method=GET status=500 trace_id=4bf92f3577b34da6a3ce929d0e0e4736",
+    "level=error ts=2026-09-28T01:09:45Z caller=chores.go:142 msg=\"runtime error: invalid memory address or nil pointer dereference\" path=/api/v1/chores method=GET status=500 trace_id=7cb8911e3b6a4a09b4f91e0a2931a711"
+  ],
+  "security_guarantee": {
+    "allowlisted_read_only_sources": ["prometheus", "loki", "git-log", "docker-ps"],
+    "database_credentials_exposed": false,
+    "production_secrets_exposed": false
+  }
+}
