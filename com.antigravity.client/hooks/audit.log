@@ -1,1 +1,2 @@
 [2026-09-25T05:48:35Z] tool=test-audit exit=0
+[2026-09-27T19:48:03Z] tool=DROP DATABASE choresync; exit=1
