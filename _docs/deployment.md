@@ -85,6 +85,7 @@ ChoreSync includes a canonical Render Blueprint configuration in [`render.yaml`]
      - `choresync-frontend`
    - When prompted for **`DATABASE_URL`**, paste your Neon connection string (`postgresql://...sslmode=require`).
    - `JWT_SECRET` is automatically generated with a secure random key.
+   - When prompted for **`BACKEND_URL`** on `choresync-frontend`, provide the backend HTTPS URL: `https://choresync-backend.onrender.com` (Caddy reverse proxies `/api/*` with `header_up Host` preventing loops).
    - `STORAGE_PROVIDER` defaults to `cloudinary` (supply `CLOUDINARY_URL` or API keys from Cloudinary dashboard) or falls back to `mock`.
    - `QUEUE_PROVIDER` defaults to `neon` (ACID-safe background job queue reusing `DATABASE_URL` with zero extra setup).
    - If using real email dispatch, set `EMAIL_PROVIDER=resend` and enter your `RESEND_API_KEY`. Otherwise, leave default `EMAIL_PROVIDER=mock`.

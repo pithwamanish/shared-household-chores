@@ -166,7 +166,16 @@ export const LoginView: React.FC<LoginViewProps> = ({
       const res = await api.login(loginEmail.trim(), loginPassword.trim());
       onLoginSuccess(res);
     } catch (err: any) {
-      setLoginError(err?.message || 'Invalid email or password. Please try again.');
+      const msg = err?.message || '';
+      if (
+        msg.toLowerCase().includes('too many requests') ||
+        msg.includes('429') ||
+        msg.toLowerCase().includes('rate limit')
+      ) {
+        setLoginError('Rate limit reached or server is busy. Please wait a moment, or use a Quick Test Persona below.');
+      } else {
+        setLoginError(msg || 'Invalid email or password. Please try again.');
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -222,8 +231,21 @@ export const LoginView: React.FC<LoginViewProps> = ({
     try {
       const res = await api.requestMagicLink(magicEmail.trim());
       setMagicMessage(res.message || `Magic login link sent to ${magicEmail.trim()}! Please check your email inbox.`);
+      if (res.token) {
+        setMagicCode(res.token);
+      }
     } catch (err: any) {
-      setMagicError(err?.message || 'Could not send login link.');
+      const msg = err?.message || '';
+      if (
+        msg.toLowerCase().includes('too many requests') ||
+        msg.includes('429') ||
+        msg.toLowerCase().includes('rate limit') ||
+        msg.toLowerCase().includes('security purposes')
+      ) {
+        setMagicError('Email dispatch rate limit reached. Please wait 60 seconds before retrying, or sign in using Password / Demo Persona.');
+      } else {
+        setMagicError(msg || 'Could not send login link.');
+      }
     } finally {
       setIsRequestingMagic(false);
     }
@@ -259,8 +281,21 @@ export const LoginView: React.FC<LoginViewProps> = ({
     try {
       const res = await api.requestPasswordReset(forgotEmail.trim());
       setForgotMessage(res.message || `Password reset link sent to ${forgotEmail.trim()}! Please check your email inbox.`);
+      if (res.token) {
+        setResetToken(res.token);
+      }
     } catch (err: any) {
-      setForgotError(err?.message || 'Failed to request password reset.');
+      const msg = err?.message || '';
+      if (
+        msg.toLowerCase().includes('too many requests') ||
+        msg.includes('429') ||
+        msg.toLowerCase().includes('rate limit') ||
+        msg.toLowerCase().includes('security purposes')
+      ) {
+        setForgotError('Password reset rate limit reached. Please wait 60 seconds before retrying, or sign in with seed credentials.');
+      } else {
+        setForgotError(msg || 'Failed to request password reset.');
+      }
     } finally {
       setIsRequestingForgot(false);
     }
@@ -456,6 +491,44 @@ export const LoginView: React.FC<LoginViewProps> = ({
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
+
+              {/* 1-Click Quick Test Personas (Seed Accounts) */}
+              <div className="pt-4 border-t border-zinc-700/60 space-y-2">
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <span className="font-bold uppercase tracking-wider text-[10px] text-zinc-500">Quick Test Personas (1-Click)</span>
+                  <span className="text-[11px] text-zinc-500">Instant sign-in</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('sarah@example.com');
+                      setLoginPassword('password123');
+                      api.login('sarah@example.com', 'password123').then(onLoginSuccess).catch(() => {
+                        api.demoLogin('m-sarah').then(onLoginSuccess);
+                      });
+                    }}
+                    className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-700/80 border border-zinc-700/70 text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="text-xs font-bold text-white group-hover:text-indigo-300">Sarah Chen</div>
+                    <div className="text-[10px] text-zinc-400">Flatmate Admin (Seed)</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('david@example.com');
+                      setLoginPassword('password123');
+                      api.login('david@example.com', 'password123').then(onLoginSuccess).catch(() => {
+                        api.demoLogin('m-david-fam').then(onLoginSuccess);
+                      });
+                    }}
+                    className="px-3 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-700/80 border border-zinc-700/70 text-left transition-colors cursor-pointer group"
+                  >
+                    <div className="text-xs font-bold text-white group-hover:text-indigo-300">David Miller</div>
+                    <div className="text-[10px] text-zinc-400">Family Admin (Seed)</div>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 

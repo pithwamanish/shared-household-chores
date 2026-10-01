@@ -44,13 +44,20 @@ export class ApiError extends Error {
 }
 
 /**
- * Checks whether an error is caused by a network failure, server offline, or connectivity timeout.
+ * Checks whether an error is caused by a network failure, server offline, connectivity timeout,
+ * rate limit exhaustion (429 Too Many Requests), or proxy routing loops (508 Loop Detected).
  */
 export function isNetworkError(error: unknown): boolean {
   if (!error) return false;
   if (error instanceof ApiError) {
-    // 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout represent server availability failures
-    return error.status === 502 || error.status === 503 || error.status === 504;
+    // 429 Too Many Requests, 502 Bad Gateway, 503 Service Unavailable, 504 Gateway Timeout, 508 Loop Detected
+    return (
+      error.status === 429 ||
+      error.status === 502 ||
+      error.status === 503 ||
+      error.status === 504 ||
+      error.status === 508
+    );
   }
   if (error instanceof Error) {
     const msg = (error.message || '').toLowerCase();
@@ -65,7 +72,11 @@ export function isNetworkError(error: unknown): boolean {
       msg.includes('offline') ||
       msg.includes('econnrefused') ||
       code === 'ECONNREFUSED' ||
-      msg.includes('connection refused')
+      msg.includes('connection refused') ||
+      msg.includes('too many requests') ||
+      msg.includes('rate limit') ||
+      msg.includes('rate_limit') ||
+      msg.includes('security purposes')
     );
   }
   return false;

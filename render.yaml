@@ -150,7 +150,9 @@ services:
 
       # Public HTTPS URL of the backend web service on Render Free Tier.
       # Render Free Tier web services communicate via their public URLs.
-      # Set this to your deployed backend URL: https://choresync-backend.onrender.com
+      # Set this to your deployed backend URL (MUST include https:// scheme):
+      # e.g., https://choresync-backend.onrender.com
+      # Caddy reverse proxies /api/* using header_up Host to eliminate edge routing loops.
       - key: BACKEND_URL
         sync: false
 
